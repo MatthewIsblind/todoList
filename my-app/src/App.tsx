@@ -8,8 +8,13 @@ const App : FC = () => {
     <div className="App">
       <div className = 'header'>
         <InputContainer></InputContainer>
+        <button className='button'>Add task</button>
       </div>
-      <div className = 'todoList'></div>
+      
+      <div className = 'todoList'>
+        
+
+      </div>
     </div>
   );
 }
