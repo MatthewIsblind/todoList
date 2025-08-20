@@ -10,6 +10,9 @@ const App : FC = () => {
 
   return (
     <div className="App">
+       <h1 className="text-3xl font-bold underline text-blue-500">
+          Hello world!
+        </h1>
         <div className = 'header'>
             <InputContainer todoList={todoList} setTodoList={setTodoList} />
         </div>
