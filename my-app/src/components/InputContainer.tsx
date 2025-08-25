@@ -29,7 +29,8 @@ const InputContainer : FC<InputContainerProps> = ({ todoList, setTodoList }) => 
         }, [todoList]);
     
     const addTask = ():void => {
-        console.log("testing" + task + deadline)
+        
+        console.log("adding task : " + task +"deadline : " + deadline)
         const newTask = {TaskName : task , Deadline : deadline}
         //this is appending newTask to todolist array
         setTodoList([...todoList,newTask]);

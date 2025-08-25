@@ -3,11 +3,13 @@ import { ITask } from '../Interfaces';
 
 
 type TodoTaskProps = {
-  task? : ITask;
+  task : ITask;
+  //Passing through a function here to be called so that i can change information from the parent(TodoList)
+  deleteTask: (taskName: string) => void;
 };
 
 
-const TodoTask: React.FC<TodoTaskProps> = ({ task }) => {
+const TodoTask: React.FC<TodoTaskProps> = ({ task ,deleteTask}) => {
   return (
     <div className='flex w-full max-w-md h-12 text-white mb-4 rounded-md overflow-hidden shadow'>
         <div className='flex flex-1'>
@@ -15,7 +17,9 @@ const TodoTask: React.FC<TodoTaskProps> = ({ task }) => {
             <span className='flex-1 grid place-items-center bg-red-500 border border-white text-lg'>{task?.Deadline}</span>
         </div>
 
-        <button className='w-24 h-full bg-purple-600 text-white hover:bg-purple-700'>remove</button>
+        <button className="w-24 h-full bg-purple-600 text-white hover:bg-purple-700" onClick={()=> deleteTask(task.TaskName)}>
+        Remove
+      </button>
     </div>
   )
 }
