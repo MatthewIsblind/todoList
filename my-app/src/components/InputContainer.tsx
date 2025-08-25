@@ -39,16 +39,32 @@ const InputContainer : FC<InputContainerProps> = ({ todoList, setTodoList }) => 
         setTask("");
     }
 
-    return (
-        <div>
-           <div className='InputContainer'>
-                <div className='input-fields'>
-                    <input type = 'text' className='input' placeholder='Task ...' name="task" value={task} onChange={handleChange}></input>
-                    <input type = 'number' className='input' placeholder='Deadline (in Days)' name = "deadline" value={deadline} onChange={handleChange} ></input>
-                </div>
-                <button className='button' onClick={addTask}>Add task</button>
+        return (
+        <div className="flex items-stretch center">
+            <div className="flex flex-col rounded-l-md overflow-hidden">
+                <input
+                    type='text'
+                    className='w-52 h-10 px-2 text-lg border border-gray-300'
+                    placeholder='Task ...'
+                    name="task"
+                    value={task}
+                    onChange={handleChange}
+                />
+                <input
+                    type='number'
+                    className='w-52 h-10 px-2 text-lg border border-gray-300 border-t-0'
+                    placeholder='Deadline (in Days)'
+                    name="deadline"
+                    value={deadline}
+                    onChange={handleChange}
+                />
             </div>
-            
+            <button
+                className='w-24 h-full bg-blue-600 text-white text-lg rounded-r-md hover:bg-blue-700'
+                onClick={addTask}
+            >
+                Add task
+            </button>
         </div>
     )
 }
