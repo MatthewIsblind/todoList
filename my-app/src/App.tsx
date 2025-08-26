@@ -9,7 +9,7 @@ const App : FC = () => {
   const [todoList, setTodoList] = useState<ITask[]>([]);
 
   return (
-    <Router>
+    <Router basename={process.env.PUBLIC_URL}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/todolist" element={<TodoList />} />
