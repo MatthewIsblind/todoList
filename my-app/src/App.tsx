@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import TodoList from './pages/TodoList';
 import About from './pages/About';
+import Bin from './pages/Bin';
 
 const App : FC = () => {
   const [todoList, setTodoList] = useState<ITask[]>([]);
@@ -13,6 +14,7 @@ const App : FC = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/todolist" element={<TodoList />} />
+        <Route path="/bin" element={<Bin />} />
         <Route path="/about" element={<About />} />
       </Routes>
     </Router>

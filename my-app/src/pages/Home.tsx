@@ -17,6 +17,13 @@ const Home: React.FC = () => {
         >
           <h2 className="text-xl font-semibold">About</h2>
         </Link>
+        <Link
+          to="/bin"
+          className="p-10 bg-white rounded shadow transition transform hover:scale-105 hover:shadow-xl"
+        >
+          <h2 className="text-xl font-semibold">Bin</h2>
+        </Link>
+
       </div>
     </div>
   );
