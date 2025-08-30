@@ -94,12 +94,13 @@ const Contact: React.FC = () => {
 
     const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
         const { name, value } = event.target;
+        const trimmedValue = value.trim(); 
         if (name === 'street') {
-            setStreet(value);
+            setStreet(trimmedValue);
         } else if (name === 'suburb') {
-            setSuburb(value);
+            setSuburb(trimmedValue);
         } else if (name === 'streetNumber') {
-            setStreetNumber(value);
+            setStreetNumber(trimmedValue);
         }
     };
 
