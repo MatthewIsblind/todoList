@@ -24,25 +24,42 @@ const Contact: React.FC = () => {
 
     const [loading, setLoading] = useState<boolean>(false);
 
-    // Check whether the current week is the recycle data
+    // Check whether the current week is the recycle week
     const processBinInfo = (data: BinInfo[]): void => {
-        
-        const firstNextRecycling = data[0]?.next_recycling_date;
-        console.log('Next recycling date:', firstNextRecycling);
-        // TODO: add additional handling logic here
+        //state update are asynchronous, make a string to build it then set the
+        //notes variable 
+        let newNotes = "";
 
-       
-        setNotes('Next recycling date: ' + firstNextRecycling)
+        const binDay = data[0]?.day_of_week
+        if (!binDay) {
+            setNotes('No bin day available');
+            return;
+        }
+        newNotes = `Binday is ${binDay}\n`;
+
+        const firstNextRecycling = data[0]?.next_recycling_date;
+        if (!firstNextRecycling) {
+            newNotes = newNotes + ('No recycling date available');
+            return;
+        }
+        
+        newNotes = newNotes + `Next recycling date: ${firstNextRecycling}\n`; 
+        const nextDate = new Date(firstNextRecycling);
+        const now = new Date();
+
+        console.log(newNotes + 'Now :' + now);
+
+        setNotes(newNotes)
     };
 
     const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
         const { name, value } = event.target;
         if (name === 'street') {
-        setStreet(value);
+            setStreet(value);
         } else if (name === 'suburb') {
-        setSuburb(value);
+            setSuburb(value);
         } else if (name === 'streetNumber') {
-        setStreetNumber(value);
+            setStreetNumber(value);
         }
     };
 
@@ -50,6 +67,7 @@ const Contact: React.FC = () => {
         event.preventDefault();
         if (!street || !suburb || !streetNumber) {
             console.warn('Street, suburb, and street number are required');
+            setNotes('Street, suburb, and street number are required')
             return;
         }
         setLoading(true);
