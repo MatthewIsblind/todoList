@@ -22,6 +22,8 @@ const Contact: React.FC = () => {
     const [binData, setBinData] = useState<BinInfo[]>([]);
     const [notes, setNotes] = useState<string>("");
 
+    const [loading, setLoading] = useState<boolean>(false);
+
     // Check whether the current week is the recycle data
     const processBinInfo = (data: BinInfo[]): void => {
         
@@ -50,6 +52,7 @@ const Contact: React.FC = () => {
             console.warn('Street, suburb, and street number are required');
             return;
         }
+        setLoading(true);
         const baseUrl =
         'https://ipaasapi.brisbane.qld.gov.au/property/v3/properties/waste_flags';
         const params = new URLSearchParams({
@@ -80,6 +83,8 @@ const Contact: React.FC = () => {
             processBinInfo(data);
         } catch (error) {
             console.error('Error fetching bin data:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -113,8 +118,16 @@ const Contact: React.FC = () => {
                 onChange={handleChange}
             />
             
-            <button type="submit" className="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600">
-            Submit
+            <button
+                type="submit"
+                className="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600 flex items-center justify-center"
+                disabled={loading}
+            >
+                {loading ? (
+                    <div className="h-5 w-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                    'Submit'
+                )}
             </button>
             </form>
             
