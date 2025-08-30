@@ -94,13 +94,13 @@ const Contact: React.FC = () => {
 
     const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
         const { name, value } = event.target;
-        const trimmedValue = value.trim(); 
+        
         if (name === 'street') {
-            setStreet(trimmedValue);
+            setStreet(value);
         } else if (name === 'suburb') {
-            setSuburb(trimmedValue);
+            setSuburb(value);
         } else if (name === 'streetNumber') {
-            setStreetNumber(trimmedValue);
+            setStreetNumber(value);
         }
     };
 
@@ -115,9 +115,9 @@ const Contact: React.FC = () => {
         const baseUrl =
         'https://ipaasapi.brisbane.qld.gov.au/property/v3/properties/waste_flags';
         const params = new URLSearchParams({
-        suburb_name: suburb,
-        street_name: street,
-        street_number: streetNumber,
+        suburb_name: suburb.trim(),
+        street_name: street.trim(),
+        street_number: streetNumber.trim(),
         });
         
         const url = `${baseUrl}?${params.toString()}`;
