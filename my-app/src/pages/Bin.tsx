@@ -53,7 +53,7 @@ const Contact: React.FC = () => {
         if(checkNextBindayRecycle(binDay,nextDate) == true){
             newNotes = newNotes + "\nRemeber to take the recycling bin out for this bin day"
         } else {
-            newNotes = newNotes + "\nYou're good. Not recycling bin for this bin day"
+            newNotes = newNotes + "\nYou're good. No recycling bin for this bin day"
         }
         setNotes(newNotes)
     };
