@@ -1,11 +1,37 @@
 import React, { ChangeEvent, FormEvent, useState } from 'react';
 
+// Model representing the structure of the bin data returned from the API
+interface BinInfo {
+    day_of_week: string;
+    frequency: string;
+    house_number: number;
+    house_number_suffix: string | null;
+    next_recycling_date: string;
+    recurrence: string;
+    street_name: string;
+    suburb_name: string;
+    unit_number: number | null;
+}
+
+
 const Contact: React.FC = () => {
 
     const[street,setStreet] = useState<string>("");
     const[suburb,setSuburb] = useState<string>("");
     const[streetNumber,setStreetNumber] = useState<string>("");
-    const[APIResponse, setAPIResponse] = useState<string>("");
+    const [binData, setBinData] = useState<BinInfo[]>([]);
+    const [notes, setNotes] = useState<string>("");
+
+    // Check whether the current week is the recycle data
+    const processBinInfo = (data: BinInfo[]): void => {
+        
+        const firstNextRecycling = data[0]?.next_recycling_date;
+        console.log('Next recycling date:', firstNextRecycling);
+        // TODO: add additional handling logic here
+
+       
+        setNotes('Next recycling date: ' + firstNextRecycling)
+    };
 
     const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
         const { name, value } = event.target;
@@ -46,15 +72,16 @@ const Contact: React.FC = () => {
             if (!response.ok) {
                 throw new Error(`Request failed with status ${response.status}`);
             }
-            const data = await response.json();
+            const data: BinInfo[] = await response.json();
 
             console.log(data);
-            setAPIResponse(JSON.stringify(data));
+            setBinData(data);
+            
+            processBinInfo(data);
         } catch (error) {
             console.error('Error fetching bin data:', error);
         }
     };
-
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -91,8 +118,8 @@ const Contact: React.FC = () => {
             </button>
             </form>
             
-            <textarea className="w-full p-2 border border-gray-300 rounded h-32" value={APIResponse} readOnly />
-
+            <textarea className="w-full p-2 border border-gray-300 rounded h-32" value={JSON.stringify(binData, null, 2)}readOnly />
+            <textarea className="w-full p-2 border border-gray-300 rounded h-32" value={notes}readOnly />
         </div>
         
         </div>
