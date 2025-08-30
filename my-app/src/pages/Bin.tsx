@@ -37,20 +37,60 @@ const Contact: React.FC = () => {
         }
         newNotes = `Binday is ${binDay}\n`;
 
-        const firstNextRecycling = data[0]?.next_recycling_date;
-        if (!firstNextRecycling) {
+        const nextRecyclingDate = data[0]?.next_recycling_date;
+        if (!nextRecyclingDate) {
             newNotes = newNotes + ('No recycling date available');
             return;
         }
         
-        newNotes = newNotes + `Next recycling date: ${firstNextRecycling}\n`; 
-        const nextDate = new Date(firstNextRecycling);
+        newNotes = newNotes + `Next recycling date: ${nextRecyclingDate}\n`; 
+        const nextDate = new Date(nextRecyclingDate);
         const now = new Date();
 
         console.log(newNotes + 'Now :' + now);
-
+        
+        console.log()
+        if(checkNextBindayRecycle(binDay,nextDate) == true){
+            newNotes = newNotes + "\nRemeber to take the recycling bin out for this bin day"
+        } else {
+            newNotes = newNotes + "\nYou're good. Not recycling bin for this bin day"
+        }
         setNotes(newNotes)
     };
+
+    function checkNextBindayRecycle(day: string, nextRecyclingDate : Date): Boolean {
+        const weekdayNames = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ];
+        
+        const target = weekdayNames.indexOf(day);
+        if (target === -1) throw new Error("Invalid weekday name");
+
+        const today = new Date();
+        // Convert JS getDay() (0=Sunday..6=Saturday) to Monday=0..Sunday=6
+        const todayIndex = (today.getDay() + 6) % 7;
+
+        let daysAhead = (target - todayIndex + 7) % 7;
+        if (daysAhead === 0) daysAhead = 7; // if it's today, push to next week
+
+        const result = new Date(today);
+        result.setDate(today.getDate() + daysAhead);
+
+        console.log(`result ${result}  next${nextRecyclingDate} `)
+        if (result.toDateString() === nextRecyclingDate.toDateString()) {
+            return true
+        } 
+        return false;
+
+
+    }
+
 
     const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
         const { name, value } = event.target;
