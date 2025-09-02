@@ -1,5 +1,7 @@
 export interface ITask {
-    TaskName : string;
-    Deadline : number;
+    id: number;
+    description: string;
+    date: string; // format: YYYY-MM-DD
+    time: string; // format: HH:MM
 }
 
