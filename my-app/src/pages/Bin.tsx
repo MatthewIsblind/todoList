@@ -13,15 +13,21 @@ interface BinInfo {
     unit_number: number | null;
 }
 
+interface BinProps {
+    /**
+     * When true, omit the full-screen height so the component can be embedded
+     * inside other layouts (e.g. a modal).
+     */
+    embedded?: boolean;
+}
 
-const Contact: React.FC = () => {
+const Contact: React.FC<BinProps> = ({embedded = false}) => {
 
     const[street,setStreet] = useState<string>("");
     const[suburb,setSuburb] = useState<string>("");
     const[streetNumber,setStreetNumber] = useState<string>("");
     const [binData, setBinData] = useState<BinInfo[]>([]);
     const [notes, setNotes] = useState<string>("");
-
     const [loading, setLoading] = useState<boolean>(false);
 
     // Check whether the current week is the recycle week
@@ -148,52 +154,61 @@ const Contact: React.FC = () => {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="w-full max-w-xl p-10 bg-white rounded shadow">
-            <h1 className="mb-6 text-2xl font-bold text-center">Bin Information</h1>
-            <form className="space-y-4" onSubmit={handleSubmit}>
-            <input
-                type="text"
-                className="w-full p-2 border border-gray-300 rounded"
-                placeholder="Street Number"
-                name="streetNumber"
-                value={streetNumber}
-                onChange={handleChange}
-            />
-            <input
-                type="text"
-                className="w-full p-2 border border-gray-300 rounded"
-                placeholder="Street"
-                name="street"
-                value={street}
-                onChange={handleChange}
-            />
-            <input
-                type="text"
-                className="w-full p-2 border border-gray-300 rounded"
-                placeholder="Suburb"
-                name="suburb"
-                value={suburb}
-                onChange={handleChange}
-            />
-            
-            <button
-                type="submit"
-                className="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600 flex items-center justify-center"
-                disabled={loading}
-            >
-                {loading ? (
-                    <div className="h-5 w-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                    'Submit'
-                )}
-            </button>
-            </form>
-            
-            <textarea className="w-full p-2 border border-gray-300 rounded h-32" value={JSON.stringify(binData, null, 2)}readOnly />
-            <textarea className="w-full p-2 border border-gray-300 rounded h-32" value={notes}readOnly />
-        </div>
-        
+        <div
+            className={`flex items-center justify-center ${embedded ? '' : 'min-h-screen'} bg-gray-100`}
+        >
+            <div className="w-full max-w-xl p-10 bg-white rounded shadow">
+                <h1 className="mb-6 text-2xl font-bold text-center">Bin Information</h1>
+                <form className="space-y-4" onSubmit={handleSubmit}>
+                    <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded"
+                        placeholder="Street Number"
+                        name="streetNumber"
+                        value={streetNumber}
+                        onChange={handleChange}
+                    />
+                    <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded"
+                        placeholder="Street"
+                        name="street"
+                        value={street}
+                        onChange={handleChange}
+                    />
+                    <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded"
+                        placeholder="Suburb"
+                        name="suburb"
+                        value={suburb}
+                        onChange={handleChange}
+                    />
+
+                    <button
+                        type="submit"
+                        className="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600 flex items-center justify-center"
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <div className="h-5 w-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            'Check bin date'
+                        )}
+                    </button>
+                </form>
+
+                <textarea
+                    className="w-full p-2 border border-gray-300 rounded h-32"
+                    value={JSON.stringify(binData, null, 2)}
+                    readOnly
+                />
+                <textarea
+                    className="w-full p-2 border border-gray-300 rounded h-32"
+                    value={notes}
+                    readOnly
+                />
+            </div>
         </div>
     );
 };
