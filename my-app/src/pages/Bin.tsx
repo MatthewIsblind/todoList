@@ -157,7 +157,7 @@ const Contact: React.FC<BinProps> = ({embedded = false}) => {
         <div
             className={`flex items-center justify-center ${embedded ? '' : 'min-h-screen'} bg-gray-100`}
         >
-            <div className="w-full max-w-xl p-10 bg-white rounded shadow">
+            <div className="w-full max-w-sm sm:max-w-xl p-4 sm:p-10 bg-white rounded shadow max-h-[90vh] overflow-y-auto">
                 <h1 className="mb-6 text-2xl font-bold text-center">Bin Information</h1>
                 <form className="space-y-4" onSubmit={handleSubmit}>
                     <input

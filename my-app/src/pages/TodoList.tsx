@@ -65,9 +65,9 @@ const TodoList: FC = () => {
         ))}
       </div>
 
-      {showBin && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded shadow max-w-xl w-full">
+       {showBin && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-white p-4 sm:p-6 rounded shadow w-full max-w-sm sm:max-w-xl max-h-full overflow-auto">
             <button
               className="mb-2 px-4 py-1 bg-red-500 text-white rounded hover:bg-red-600"
               onClick={() => setShowBin(false)}
