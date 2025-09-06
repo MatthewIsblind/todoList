@@ -1,4 +1,4 @@
-import React, { FC, useState ,useEffect} from 'react';
+import React, { FC, useState, useEffect } from 'react';
 import { ITask } from '../Interfaces';
 import InputContainer from '../components/InputContainer';
 import TodoTask from '../components/TodoTask';
@@ -9,7 +9,7 @@ import { useTasks } from '../TasksContext';
 const TodoList: FC = () => {
 
   //Dictionary that uses string(selected date as key),listt of tasks as values)
-  const { getTasks, deleteTask } = useTasks();
+  const { getTasks, deleteTask ,getTasksByDate} = useTasks();
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -23,9 +23,10 @@ const TodoList: FC = () => {
     deleteTask(selectedDate, taskId);
   };
 
-  useEffect(() => {
-        console.log("Updated todo list:", getTasksByDate);
-        }, [todoList]);
+   useEffect(() => {
+    // Log the entire task mapping whenever the tasks for the selected date change
+    console.log('Updated todo list:', getTasksByDate());
+  }, [todoList, getTasksByDate]);
   
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gray-100 font-sans p-4">

@@ -40,15 +40,28 @@ const Contact: React.FC<BinProps> = ({embedded = false,todoList,setTodoList}) =>
     const { addTask } = useTasks();
 
     const addNextBinTask = () => {
-        const date = binData[0].recurrence;
+        const rawDate = binData[0].recurrence;
+        
+        const nextBinDate = rawDate.split('T')[0];
+        const recyclingDate = binData[0].next_recycling_date.split('T')[0];
+
+        let description = '';
+        if (recyclingDate === nextBinDate){
+            description = 'Take the bin out including recycling'
+
+        } else {
+
+            description = 'Take the bin out. No recycling this week'
+        }
+
         const task: ITask = {
             id: Date.now(),
-            description: 'Put bins out',
+            description: description,
             time: '18:00',
-            date : date,
+            date : nextBinDate,
         };
         console.log('next bin task',task)
-        addTask(date, task);
+        addTask(nextBinDate, task);
     };
 
     // Check whether the current week is the recycle week

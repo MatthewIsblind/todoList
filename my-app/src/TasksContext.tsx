@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode ,useCallback} from 'react';
 import { ITask } from './Interfaces';
 
 interface TaskContextType {
@@ -32,9 +32,10 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     return tasksByDate[date] || [];
   };
 
-  const getTasksByDate = () => {
-    return tasksByDate;
-  }
+  const getTasksByDate = useCallback(() => {
+    // Return a shallow copy so consumers can't mutate state directly
+    return { ...tasksByDate };
+  }, [tasksByDate]);
 
   return (
     <TaskContext.Provider value={{ tasksByDate, addTask, deleteTask, getTasks ,getTasksByDate}}>
