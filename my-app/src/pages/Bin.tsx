@@ -1,4 +1,6 @@
 import React, { ChangeEvent, FormEvent, useState } from 'react';
+import {ITask} from '../Interfaces';
+import { useTasks } from '../TasksContext';
 
 // Model representing the structure of the bin data returned from the API
 interface BinInfo {
@@ -19,9 +21,15 @@ interface BinProps {
      * inside other layouts (e.g. a modal).
      */
     embedded?: boolean;
+    //The function will be used when the bin info is being called in the todolist page
+    setTodoList?: (tasks: ITask[]) => void;
+
+    //todo list from Todolist.tsx is just passed so that it can be modified if this bin page is being called in the 
+    //todo list page
+    todoList?: ITask[]
 }
 
-const Contact: React.FC<BinProps> = ({embedded = false}) => {
+const Contact: React.FC<BinProps> = ({embedded = false,todoList,setTodoList}) => {
 
     const[street,setStreet] = useState<string>("");
     const[suburb,setSuburb] = useState<string>("");
@@ -29,6 +37,32 @@ const Contact: React.FC<BinProps> = ({embedded = false}) => {
     const [binData, setBinData] = useState<BinInfo[]>([]);
     const [notes, setNotes] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
+    const { addTask } = useTasks();
+
+    const addNextBinTask = () => {
+        const rawDate = binData[0].recurrence;
+        
+        const nextBinDate = rawDate.split('T')[0];
+        const recyclingDate = binData[0].next_recycling_date.split('T')[0];
+
+        let description = '';
+        if (recyclingDate === nextBinDate){
+            description = 'Take the bin out including recycling'
+
+        } else {
+
+            description = 'Take the bin out. No recycling this week'
+        }
+
+        const task: ITask = {
+            id: Date.now(),
+            description: description,
+            time: '18:00',
+            date : nextBinDate,
+        };
+        console.log('next bin task',task)
+        addTask(nextBinDate, task);
+    };
 
     // Check whether the current week is the recycle week
     const processBinInfo = (data: BinInfo[]): void => {
@@ -56,7 +90,7 @@ const Contact: React.FC<BinProps> = ({embedded = false}) => {
         console.log(newNotes + 'Now :' + now);
         
         console.log()
-        if(checkNextBindayRecycle(binDay,nextDate) == true){
+        if(checkNextBindayRecycle(binDay,nextDate)){
             newNotes = newNotes + "\nRemeber to take the recycling bin out for this bin day"
         } else {
             newNotes = newNotes + "\nYou're good. No recycling bin for this bin day"
@@ -199,7 +233,7 @@ const Contact: React.FC<BinProps> = ({embedded = false}) => {
                 </form>
 
                 <textarea
-                    className="w-full p-2 border border-gray-300 rounded h-32"
+                    className="w-full p-2 border border-gray-300 rounded h-18"
                     value={JSON.stringify(binData, null, 2)}
                     readOnly
                 />
@@ -208,7 +242,16 @@ const Contact: React.FC<BinProps> = ({embedded = false}) => {
                     value={notes}
                     readOnly
                 />
+                {embedded && (
+                    <button type="button" 
+                    onClick={addNextBinTask} 
+                    className="mt-4 w-full p-2 text-white bg-green-500 rounded hover:bg-green-600">
+                        Save the date as reminder
+                    </button>
+                )}
             </div>
+
+            
         </div>
     );
 };
