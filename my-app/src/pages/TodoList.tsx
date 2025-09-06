@@ -29,7 +29,7 @@ const TodoList: FC = () => {
   const deleteTask = (taskId: number): void => {
     setTodoList(todoList.filter((task) => task.id !== taskId));
   };
-  
+
   
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gray-100 font-sans p-4">
@@ -74,7 +74,7 @@ const TodoList: FC = () => {
             >
               Close
             </button>
-            <Bin embedded />
+            <Bin embedded={true} todoList = {todoList} setTodoList={setTodoList}  />
           </div>
         </div>
       )}

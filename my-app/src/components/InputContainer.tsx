@@ -32,8 +32,8 @@ const InputContainer : FC<InputContainerProps> = ({ todoList, setTodoList, selec
         const newTask: ITask = {
         id: Date.now(),
             description,
-            time,
             date: selectedDate,
+            time
         };
         // Append newTask to current todo list
         // The setTodolist will then replace the

@@ -1,4 +1,5 @@
 import React, { ChangeEvent, FormEvent, useState } from 'react';
+import {ITask} from '../Interfaces';
 
 // Model representing the structure of the bin data returned from the API
 interface BinInfo {
@@ -19,9 +20,15 @@ interface BinProps {
      * inside other layouts (e.g. a modal).
      */
     embedded?: boolean;
+    //The function will be used when the bin info is being called in the todolist page
+    setTodoList?: (tasks: ITask[]) => void;
+
+    //todo list from Todolist.tsx is just passed so that it can be modified if this bin page is being called in the 
+    //todo list page
+    todoList?: ITask[]
 }
 
-const Contact: React.FC<BinProps> = ({embedded = false}) => {
+const Contact: React.FC<BinProps> = ({embedded = false,todoList,setTodoList}) => {
 
     const[street,setStreet] = useState<string>("");
     const[suburb,setSuburb] = useState<string>("");
@@ -153,6 +160,24 @@ const Contact: React.FC<BinProps> = ({embedded = false}) => {
         }
     };
 
+    const addNextBinTask = (): void => {
+        const taskDescription = 'testing';
+        const newTask: ITask = {
+            id: Date.now(),
+            description :taskDescription,
+            date : binData[0].recurrence,
+            time: "18:00pm",
+            };
+        
+        
+        // Append newTask to current todo list
+        // The setTodolist will then replace the
+        const current = todoList ?? []; 
+        setTodoList?.([...current, newTask]);
+        console.log("newTask:", newTask); 
+    };
+
+
     return (
         <div
             className={`flex items-center justify-center ${embedded ? '' : 'min-h-screen'} bg-gray-100`}
@@ -199,7 +224,7 @@ const Contact: React.FC<BinProps> = ({embedded = false}) => {
                 </form>
 
                 <textarea
-                    className="w-full p-2 border border-gray-300 rounded h-32"
+                    className="w-full p-2 border border-gray-300 rounded h-18"
                     value={JSON.stringify(binData, null, 2)}
                     readOnly
                 />
@@ -208,7 +233,16 @@ const Contact: React.FC<BinProps> = ({embedded = false}) => {
                     value={notes}
                     readOnly
                 />
+                {embedded && (
+                    <button type="button" 
+                    onClick={addNextBinTask} 
+                    className="mt-4 w-full p-2 text-white bg-green-500 rounded hover:bg-green-600">
+                        Save the date as reminder
+                    </button>
+                )}
             </div>
+
+            
         </div>
     );
 };
