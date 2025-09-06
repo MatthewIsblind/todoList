@@ -1,13 +1,15 @@
-import React, { FC, useState } from 'react';
+import React, { FC, useState ,useEffect} from 'react';
 import { ITask } from '../Interfaces';
 import InputContainer from '../components/InputContainer';
 import TodoTask from '../components/TodoTask';
 import Bin from './Bin';
+import { useTasks } from '../TasksContext';
+
 
 const TodoList: FC = () => {
 
   //Dictionary that uses string(selected date as key),listt of tasks as values)
-  const [tasksByDate, setTasksByDate] = useState<Record<string, ITask[]>>({});
+  const { getTasks, deleteTask } = useTasks();
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -15,21 +17,15 @@ const TodoList: FC = () => {
   const [showBin, setShowBin] = useState(false);
 
   //Grab the relevent list of tasks uses the date, updates whenever setSelectedDate is called to change the date
-  const todoList = tasksByDate[selectedDate] || [];
+  const todoList = getTasks(selectedDate);
 
-  //add tasks to the dictionary. 
-  // By replacing the list of tasks that have the key[selectedDate], so only 
-  //tasksByDate[selectedDate] is updated
-  const setTodoList = (tasks: ITask[]) => {
-    setTasksByDate((prev) => ({ ...prev, [selectedDate]: tasks }));
-    console.log(tasksByDate)
+  const handleDelete = (taskId: number): void => {
+    deleteTask(selectedDate, taskId);
   };
 
-  //remove task by id
-  const deleteTask = (taskId: number): void => {
-    setTodoList(todoList.filter((task) => task.id !== taskId));
-  };
-
+  useEffect(() => {
+        console.log("Updated todo list:", getTasksByDate);
+        }, [todoList]);
   
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gray-100 font-sans p-4">
@@ -53,15 +49,11 @@ const TodoList: FC = () => {
       {/* pass in the todolist of each day and the function that can modify 
       the todo list to the input container */}
       <div className="w-full flex justify-center">
-        <InputContainer
-          todoList={todoList}
-          setTodoList={setTodoList}
-          selectedDate={selectedDate}
-        />
+        <InputContainer selectedDate={selectedDate} />
       </div>
       <div className="w-full flex flex-col items-center mt-8">
         {todoList.map((task: ITask) => (
-          <TodoTask key={task.id} task={task} deleteTask={deleteTask} />
+          <TodoTask key={task.id} task={task} deleteTask={handleDelete} />
         ))}
       </div>
 
@@ -74,7 +66,7 @@ const TodoList: FC = () => {
             >
               Close
             </button>
-            <Bin embedded={true} todoList = {todoList} setTodoList={setTodoList}  />
+            <Bin embedded />
           </div>
         </div>
       )}

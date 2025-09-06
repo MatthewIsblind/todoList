@@ -1,5 +1,6 @@
 import React, { ChangeEvent, FormEvent, useState } from 'react';
 import {ITask} from '../Interfaces';
+import { useTasks } from '../TasksContext';
 
 // Model representing the structure of the bin data returned from the API
 interface BinInfo {
@@ -36,6 +37,19 @@ const Contact: React.FC<BinProps> = ({embedded = false,todoList,setTodoList}) =>
     const [binData, setBinData] = useState<BinInfo[]>([]);
     const [notes, setNotes] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
+    const { addTask } = useTasks();
+
+    const addNextBinTask = () => {
+        const date = binData[0].recurrence;
+        const task: ITask = {
+            id: Date.now(),
+            description: 'Put bins out',
+            time: '18:00',
+            date : date,
+        };
+        console.log('next bin task',task)
+        addTask(date, task);
+    };
 
     // Check whether the current week is the recycle week
     const processBinInfo = (data: BinInfo[]): void => {
@@ -63,7 +77,7 @@ const Contact: React.FC<BinProps> = ({embedded = false,todoList,setTodoList}) =>
         console.log(newNotes + 'Now :' + now);
         
         console.log()
-        if(checkNextBindayRecycle(binDay,nextDate) == true){
+        if(checkNextBindayRecycle(binDay,nextDate)){
             newNotes = newNotes + "\nRemeber to take the recycling bin out for this bin day"
         } else {
             newNotes = newNotes + "\nYou're good. No recycling bin for this bin day"
@@ -159,24 +173,6 @@ const Contact: React.FC<BinProps> = ({embedded = false,todoList,setTodoList}) =>
             setLoading(false);
         }
     };
-
-    const addNextBinTask = (): void => {
-        const taskDescription = 'testing';
-        const newTask: ITask = {
-            id: Date.now(),
-            description :taskDescription,
-            date : binData[0].recurrence,
-            time: "18:00pm",
-            };
-        
-        
-        // Append newTask to current todo list
-        // The setTodolist will then replace the
-        const current = todoList ?? []; 
-        setTodoList?.([...current, newTask]);
-        console.log("newTask:", newTask); 
-    };
-
 
     return (
         <div

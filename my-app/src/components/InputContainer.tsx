@@ -1,14 +1,14 @@
 import React, {FC,ChangeEvent,useState, useEffect} from 'react';
 import {ITask} from '../Interfaces';
+import { useTasks } from '../TasksContext';
 
 export interface InputContainerProps {
-  todoList: ITask[];
-  setTodoList: (tasks: ITask[]) => void;
   selectedDate: string;
 }
 
 
-const InputContainer : FC<InputContainerProps> = ({ todoList, setTodoList, selectedDate }) => {
+const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
+    const { addTask } = useTasks();
 
     const [description, setDescription] = useState<string>('');
     const [time, setTime] = useState<string>('');
@@ -24,22 +24,18 @@ const InputContainer : FC<InputContainerProps> = ({ todoList, setTodoList, selec
         }
     };
 
-    useEffect(() => {
-        console.log("Updated todo list:", todoList);
-        }, [todoList]);
+    // useEffect(() => {
+    //     console.log("Updated todo list:", todoList);
+    //     }, [todoList]);
     
-    const addTask = (): void => {
+    const addTaskHandler = (): void => {
         const newTask: ITask = {
-        id: Date.now(),
+            id: Date.now(),
             description,
+            time,
             date: selectedDate,
-            time
         };
-        // Append newTask to current todo list
-        // The setTodolist will then replace the
-        setTodoList([...todoList, newTask]);
-
-        // Reset the inputs
+        addTask(selectedDate, newTask);
         setDescription('');
         setTime('');
     };
@@ -65,7 +61,7 @@ const InputContainer : FC<InputContainerProps> = ({ todoList, setTodoList, selec
             </div>
             <button
                 className="w-24 h-full bg-blue-600 text-white text-lg rounded-r-md hover:bg-blue-700"
-                onClick={addTask}
+                onClick={addTaskHandler}
             >
                 Add task
             </button>
