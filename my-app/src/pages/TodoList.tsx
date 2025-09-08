@@ -52,7 +52,7 @@ const TodoList: FC = () => {
       <div className="w-full flex justify-center">
         <InputContainer selectedDate={selectedDate} />
       </div>
-      <div className="w-full max-w-md flex flex-col items-center mt-8 space-y-4 max-h-[60vh] overflow-y-auto">
+      <div className="w-full max-w-md flex flex-col items-center mt-8 space-y-4 flex-shrink-0">
         {todoList.map((task: ITask) => (
           <TodoTask key={task.id} task={task} deleteTask={handleDelete} />
         ))}
@@ -67,7 +67,7 @@ const TodoList: FC = () => {
             >
               Close
             </button>
-            <Bin embedded />
+            <Bin embedded onClose={() => setShowBin(false)}/>
           </div>
         </div>
       )}

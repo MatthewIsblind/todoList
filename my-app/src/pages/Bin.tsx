@@ -21,15 +21,14 @@ interface BinProps {
      * inside other layouts (e.g. a modal).
      */
     embedded?: boolean;
-    //The function will be used when the bin info is being called in the todolist page
-    setTodoList?: (tasks: ITask[]) => void;
 
-    //todo list from Todolist.tsx is just passed so that it can be modified if this bin page is being called in the 
-    //todo list page
-    todoList?: ITask[]
+    /**
+     * Optional callback to close the Bin component when used in a modal.
+     */
+    onClose?: () => void;
 }
 
-const Contact: React.FC<BinProps> = ({embedded = false,todoList,setTodoList}) => {
+const Contact: React.FC<BinProps> = ({embedded = false,onClose}) => {
 
     const[street,setStreet] = useState<string>("");
     const[suburb,setSuburb] = useState<string>("");
@@ -62,6 +61,12 @@ const Contact: React.FC<BinProps> = ({embedded = false,todoList,setTodoList}) =>
         };
         console.log('next bin task',task)
         addTask(nextBinDate, task);
+
+        // Close the modal if a close handler was provided
+        if (onClose) {
+            onClose();
+        }
+
     };
 
     // Check whether the current week is the recycle week
