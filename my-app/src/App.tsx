@@ -10,7 +10,7 @@ const App : FC = () => {
 
   return (
     <TaskProvider>
-     <Router basename={process.env.NODE_ENV === "production" ? process.env.PUBLIC_URL : "/"}>
+     <Router basename={process.env.PUBLIC_URL}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/todolist" element={<TodoList />} />

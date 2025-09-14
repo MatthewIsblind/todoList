@@ -21,7 +21,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "build:gh": "react-scripts build",
+    "build:gh": "npm run deploy",
     "build:aws": "cross-env PUBLIC_URL=/ react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
@@ -54,5 +54,5 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17"
   },
-  "homepage": "."
+  "homepage": "https://matthewisblind.github.io/todoList/"
 }
