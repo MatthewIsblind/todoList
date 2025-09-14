@@ -9,7 +9,7 @@ const Home: React.FC = () => {
           to="/todolist"
           className="p-10 bg-white rounded shadow transition transform hover:scale-105 hover:shadow-xl"
         >
-          <h2 className="text-xl font-semibold">Todo List</h2>
+          <h2 className="text-xl font-semibold">Todo List2</h2>
         </Link>
         <Link
           to="/about"
