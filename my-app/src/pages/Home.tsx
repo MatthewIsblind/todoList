@@ -1,10 +1,22 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const Home: React.FC = () => {
+type HomeProps = {
+  onLogout: () => void;
+};
+
+
+const Home: React.FC<HomeProps> = ({ onLogout }) => {
+  const handleLogout = () => {
+    onLogout();
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="grid gap-8 sm:grid-cols-2">
+        <button type="button" onClick={handleLogout} className="p-3 text-white bg-red-500 rounded shadow transition transform hover:scale-105 hover:shadow-xl">
+          Log Out
+        </button>
         <Link
           to="/todolist"
           className="p-10 bg-white rounded shadow transition transform hover:scale-105 hover:shadow-xl"

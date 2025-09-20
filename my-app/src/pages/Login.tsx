@@ -56,7 +56,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const exchangeInFlightRef = useRef(false);
 
   const exchangeEndpoint = `${apiBaseUrl}/auth/exchange`;
-
+  
   type TokenBundle = {
     idToken?: string | null;
     accessToken?: string | null;
@@ -89,6 +89,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   ]);
 
   const handleLogin = useCallback(() => {
+    console.log('handleLogin')
     if (!authorizeUrl) {
       return;
     }
@@ -124,6 +125,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       setIsProcessing(true);
       setError(null);
 
+      console.log('going to fetch using exchange endpoint')
+
       try {
         const response = await fetch(exchangeEndpoint, {
           method: 'POST',
@@ -136,6 +139,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             redirectUri: cognitoRedirectUri,
           }),
         });
+
+        console.log('get response',response)
 
         const payload = await response.json().catch(() => null);
 

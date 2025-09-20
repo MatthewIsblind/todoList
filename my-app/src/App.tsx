@@ -28,6 +28,15 @@ const App : FC = () => {
     setCookie('loggedIn', 'true', 7);
   };
 
+  const clearCookie = (name: string) => {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  };
+
+  const handleLogout = () => {
+    setLoggedIn(false);
+    clearCookie('loggedIn');
+  };
+
 
   const rawPublicUrl = process.env.PUBLIC_URL ?? '';
   let resolvedBasename = rawPublicUrl;
@@ -47,7 +56,7 @@ const App : FC = () => {
       resolvedBasename = '';
     }
   }
-  
+
   return (
     <TaskProvider>
       <Router basename={resolvedBasename}>
@@ -60,7 +69,9 @@ const App : FC = () => {
           />
           <Route
             path="/"
-            element={loggedIn ? <Home /> : <Login onLogin={handleLogin} />}
+            element={
+              loggedIn ? <Home onLogout={handleLogout} /> : <Login onLogin={handleLogin} />
+            }
           />
           <Route
             path="/todolist"

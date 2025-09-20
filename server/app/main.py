@@ -105,7 +105,11 @@ def _exchange_code(code: str, redirect_uri: str | None) -> Tuple[Dict[str, Any],
         except UserInfoError as exc:
             logger.info("Unable to fetch user info from Cognito: %s", exc)
         else:
-            logger.info("Fetched additional user info fields: %s", ", ".join(userinfo.keys()))
+            logger.info(
+                "userinfo keys: [%s] | values: [%s]",
+                ", ".join(map(str, userinfo.keys())),
+                ", ".join(map(str, userinfo.values())),
+            )
             merged_payload.update(userinfo)
 
     user = upsert_user(merged_payload)
@@ -149,6 +153,7 @@ async def exchange_code(body: ExchangeRequest):
         logger.exception("Unexpected error while exchanging code")
         return JSONResponse(status_code=500, content={"error": "Unable to exchange authorization code."})
 
+   
     token_bundle = TokenBundle(
         idToken=tokens.get("id_token"),
         accessToken=tokens.get("access_token"),
