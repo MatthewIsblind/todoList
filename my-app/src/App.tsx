@@ -31,21 +31,33 @@ const App : FC = () => {
 
   return (
     <TaskProvider>
-     <Router basename={process.env.PUBLIC_URL}>
-      <Routes>
-        <Route path="/login" element={<Login onLogin={handleLogin} />} />
-        {loggedIn ? (
-            <>
-              <Route path="/" element={<Home />} />
-              <Route path="/todolist" element={<TodoList />} />
-              <Route path="/bin" element={<Bin />} />
-              <Route path="/about" element={<About />} />
-            </>
-        ):(
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        )}
-      </Routes>
-    </Router>
+      <Router basename={process.env.PUBLIC_URL}>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              loggedIn ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />
+            }
+          />
+          <Route
+            path="/"
+            element={loggedIn ? <Home /> : <Login onLogin={handleLogin} />}
+          />
+          <Route
+            path="/todolist"
+            element={loggedIn ? <TodoList /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/bin"
+            element={loggedIn ? <Bin /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/about"
+            element={loggedIn ? <About /> : <Navigate to="/login" replace />}
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
     </TaskProvider>
   );
 }
