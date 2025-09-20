@@ -29,9 +29,28 @@ const App : FC = () => {
   };
 
 
+  const rawPublicUrl = process.env.PUBLIC_URL ?? '';
+  let resolvedBasename = rawPublicUrl;
+  if (resolvedBasename.startsWith('http')) {
+    try {
+      const parsed = new URL(resolvedBasename);
+      resolvedBasename = parsed.pathname;
+    } catch (error) {
+      resolvedBasename = '';
+    }
+  }
+
+  if (resolvedBasename && resolvedBasename !== '/') {
+    resolvedBasename = resolvedBasename.replace(/\/$/, '');
+    const currentPath = window.location.pathname;
+    if (!currentPath.startsWith(resolvedBasename)) {
+      resolvedBasename = '';
+    }
+  }
+  
   return (
     <TaskProvider>
-      <Router basename={process.env.PUBLIC_URL}>
+      <Router basename={resolvedBasename}>
         <Routes>
           <Route
             path="/login"

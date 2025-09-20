@@ -76,19 +76,27 @@ async def health() -> Dict[str, str]:
 
 
 def _process_id_token(id_token: str) -> Dict[str, Any]:
+    logger.info("Verifying Cognito ID token")
     payload = validate_id_token(id_token)
+    logger.info("Token verified for subject %s", payload.get("sub", "<unknown>"))
     user = upsert_user(payload)
+    logger.info("User record updated for subject %s", user.get("sub", "<unknown>"))
     return user
 
 
 def _exchange_code(code: str, redirect_uri: str | None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    logger.info(
+        "Exchanging authorization code for tokens (redirect_uri=%s)",
+        redirect_uri or "<default>",
+    )
     tokens = exchange_code_for_tokens(code, redirect_uri)
     id_token = tokens.get("id_token")
     if not id_token:
         raise TokenExchangeError("Cognito token response did not include an id_token.")
 
     payload = validate_id_token(id_token)
-
+    logger.info("Received ID token for subject %s", payload.get("sub", "<unknown>"))
+    
     merged_payload: Dict[str, Any] = dict(payload)
     access_token = tokens.get("access_token")
     if access_token:
@@ -97,14 +105,17 @@ def _exchange_code(code: str, redirect_uri: str | None) -> Tuple[Dict[str, Any],
         except UserInfoError as exc:
             logger.info("Unable to fetch user info from Cognito: %s", exc)
         else:
+            logger.info("Fetched additional user info fields: %s", ", ".join(userinfo.keys()))
             merged_payload.update(userinfo)
 
     user = upsert_user(merged_payload)
+    logger.info("User profile synchronized for subject %s", user.get("sub", "<unknown>"))
     return tokens, user
 
 
 @app.post("/auth/verify", response_model=VerifyResponse)
 async def verify_token(body: VerifyRequest):
+    logger.info("/auth/verify called")
     try:
         user = await run_in_threadpool(_process_id_token, body.idToken)
     except TokenVerificationError as exc:
@@ -122,6 +133,7 @@ async def verify_token(body: VerifyRequest):
 
 @app.post("/auth/exchange", response_model=ExchangeResponse)
 async def exchange_code(body: ExchangeRequest):
+    logger.info("/auth/exchange called")
     try:
         tokens, user = await run_in_threadpool(_exchange_code, body.code, body.redirectUri)
     except TokenExchangeError as exc:

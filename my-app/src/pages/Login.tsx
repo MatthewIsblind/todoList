@@ -17,7 +17,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const cognitoDomain = process.env.REACT_APP_COGNITO_DOMAIN;
   const cognitoClientId = process.env.REACT_APP_COGNITO_CLIENT_ID;
   const configuredRedirectUris = useMemo<string[]>(() => {
-    const raw = process.env.REACT_APP_COGNITO_REDIRECT_URI;
+    const raw = process.env.COGNITO_REDIRECT_URI;
     if (!raw) {
       return [];
     }
@@ -45,6 +45,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     return matchingUri ?? configuredRedirectUris[0];
   }, [configuredRedirectUris]);
+  const isUsingFallbackRedirect = configuredRedirectUris.length === 0;
+
   const responseType = process.env.REACT_APP_COGNITO_RESPONSE_TYPE ?? 'code';
   const scopes = process.env.REACT_APP_COGNITO_SCOPES ?? 'openid profile email';
   const apiBaseUrl = process.env.REACT_APP_API_BASE_URL?.replace(/\/$/, '') ?? '';
@@ -152,6 +154,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         persistTokens(tokens);
 
         onLogin();
+        console.log('nagivate')
         navigate('/', { replace: true });
       } catch (err) {
         const message = err instanceof Error
@@ -225,6 +228,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         )}
         {isProcessing && (
           <p className="text-sm text-gray-600">Signing you in…</p>
+        )}
+        {isUsingFallbackRedirect && (
+          <p className="text-xs text-yellow-700 bg-yellow-100 rounded p-2">
+            Using default redirect URI <code>{cognitoRedirectUri}</code>. Define{' '}
+            <code>REACT_APP_COGNITO_REDIRECT_URI</code> in your <code>.env</code>{' '}
+            and make sure the value matches a callback URL that is registered on
+            your Cognito app client to avoid "redirect URI is not registered"
+            errors.
+          </p>
         )}
         {error && (
           <p className="text-sm text-red-600">{error}</p>
