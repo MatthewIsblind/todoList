@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
@@ -6,131 +6,77 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [isCreating, setIsCreating] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const navigate = useNavigate();
 
+  const cognitoDomain = process.env.REACT_APP_COGNITO_DOMAIN;
+  const cognitoClientId = process.env.REACT_APP_COGNITO_CLIENT_ID;
+  const cognitoRedirectUri =
+    process.env.REACT_APP_COGNITO_REDIRECT_URI ?? `${window.location.origin}/`;
+  const responseType = process.env.REACT_APP_COGNITO_RESPONSE_TYPE ?? 'code';
+  const scopes = process.env.REACT_APP_COGNITO_SCOPES ?? 'openid profile email';
+
+  const authorizeUrl = useMemo(() => {
+    if (!cognitoDomain || !cognitoClientId) {
+      return undefined;
+    }
+
+    const baseUrl = cognitoDomain.endsWith('/')
+      ? cognitoDomain.slice(0, -1)
+      : cognitoDomain;
+
+    const params = new URLSearchParams({
+      client_id: cognitoClientId,
+      response_type: responseType,
+      scope: scopes,
+      redirect_uri: cognitoRedirectUri,
+    });
+
+    return `${baseUrl}/oauth2/authorize?${params.toString()}`;
+  }, [
+    cognitoClientId,
+    cognitoDomain,
+    cognitoRedirectUri,
+    responseType,
+    scopes,
+  ]);
+
+  const handleLogin = useCallback(() => {
+    if (!authorizeUrl) {
+      return;
+    }
+
+    window.location.assign(authorizeUrl);
+  }, [authorizeUrl]);
+
   useEffect(() => {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    if (!users['admin']) {
-      users['admin'] = 'password';
-      localStorage.setItem('users', JSON.stringify(users));
-    }
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    const hasCode = params.has('code');
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    if (users[username] && users[username] === password) {
+    if (hasCode) {
       onLogin();
-      navigate('/');
-    } else {
-      alert('Invalid credentials');
+      navigate('/', { replace: true });
     }
-  };
-
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      alert('Passwords do not match');
-      return;
-    }
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    if (users[username]) {
-      alert('User already exists');
-      return;
-    }
-    users[username] = password;
-    localStorage.setItem('users', JSON.stringify(users));
-    alert('Account created. You can now log in.');
-    setIsCreating(false);
-    setPassword('');
-    setConfirmPassword('');
-  };
+  }, [navigate, onLogin]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      {isCreating ? (
-        <form onSubmit={handleCreateSubmit} className="bg-white p-6 rounded shadow w-full max-w-sm space-y-4">
-          <h1 className="text-2xl font-bold text-center">Create Account</h1>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-          <input
-            type="password"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
+      <div className="bg-white p-6 rounded shadow w-full max-w-sm space-y-4 text-center">
+        <h1 className="text-2xl font-bold">Sign in</h1>
+        {!authorizeUrl ? (
+          <p className="text-sm text-red-600">
+            Missing Cognito configuration. Ensure the environment variables for
+            the domain and client ID are set.
+          </p>
+        ) : (
           <button
-            type="submit"
-            className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-          >
-            Create Account
-          </button>
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setIsCreating(false)}
-              className="text-blue-500 underline"
-            >
-              Back to Login
-            </button>
-          </div>
-        </form>
-      ) : (
-        <form onSubmit={handleLoginSubmit} className="bg-white p-6 rounded shadow w-full max-w-sm space-y-4">
-          <h1 className="text-2xl font-bold text-center">Login</h1>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-          <button
-            type="submit"
+            type="button"
+            onClick={handleLogin}
             className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-            Login
+            Continue with Amazon Cognito
           </button>
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsCreating(true);
-                setUsername('');
-                setPassword('');
-                setConfirmPassword('');
-              }}
-              className="text-blue-500 underline"
-            >
-              Create Account
-            </button>
-          </div>
-        </form>
-      )}
+        )}
+      </div>
     </div>
   );
 };
