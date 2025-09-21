@@ -1,4 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
@@ -6,131 +12,270 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [isCreating, setIsCreating] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    if (!users['admin']) {
-      users['admin'] = 'password';
-      localStorage.setItem('users', JSON.stringify(users));
+  const cognitoDomain = process.env.REACT_APP_COGNITO_DOMAIN;
+  const cognitoClientId = process.env.REACT_APP_COGNITO_CLIENT_ID;
+  const configuredRedirectUris = useMemo<string[]>(() => {
+    const raw = process.env.COGNITO_REDIRECT_URI;
+    if (!raw) {
+      return [];
+    }
+
+    return raw
+      .split(',')
+      .map((entry) => {
+        let cleaned = entry.trim();
+        if (!cleaned) {
+          return '';
+        }
+
+        const prefix = 'COGNITO_REDIRECT_URI=';
+        let warned = false;
+        while (cleaned.toUpperCase().startsWith(prefix)) {
+          cleaned = cleaned.slice(prefix.length).trimStart();
+          warned = true;
+        }
+
+        if (warned) {
+          console.warn(
+            "Ignoring duplicated 'COGNITO_REDIRECT_URI=' prefix in redirect URI configuration. " +
+              'Update your .env file to contain only the comma-separated list of callback URLs.',
+          );
+        }
+
+        return cleaned;
+      })
+      .filter((uri) => uri.length > 0);
+  }, []);
+
+  const cognitoRedirectUri = useMemo(() => {
+    if (configuredRedirectUris.length === 0) {
+      return `${window.location.origin}/`;
+    }
+
+    const currentOrigin = window.location.origin;
+    const matchingUri = configuredRedirectUris.find((uri) => {
+      try {
+        return new URL(uri).origin === currentOrigin;
+      } catch (error) {
+        console.warn('Ignoring invalid redirect URI from configuration:', uri, error);
+        return false;
+      }
+    });
+
+    return matchingUri ?? configuredRedirectUris[0];
+  }, [configuredRedirectUris]);
+  const isUsingFallbackRedirect = configuredRedirectUris.length === 0;
+
+  const responseType = process.env.REACT_APP_COGNITO_RESPONSE_TYPE ?? 'code';
+  const scopes = process.env.REACT_APP_COGNITO_SCOPES ?? 'openid profile email';
+  const apiBaseUrl = process.env.REACT_APP_API_BASE_URL?.replace(/\/$/, '') ?? '';
+
+  const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const exchangeInFlightRef = useRef(false);
+
+  const exchangeEndpoint = `${apiBaseUrl}/auth/exchange`;
+  
+  type TokenBundle = {
+    idToken?: string | null;
+    accessToken?: string | null;
+    refreshToken?: string | null;
+  };
+
+  const authorizeUrl = useMemo(() => {
+    if (!cognitoDomain || !cognitoClientId) {
+      return undefined;
+    }
+
+    const baseUrl = cognitoDomain.endsWith('/')
+      ? cognitoDomain.slice(0, -1)
+      : cognitoDomain;
+
+    const params = new URLSearchParams({
+      client_id: cognitoClientId,
+      response_type: responseType,
+      scope: scopes,
+      redirect_uri: cognitoRedirectUri,
+    });
+
+    return `${baseUrl}/oauth2/authorize?${params.toString()}`;
+  }, [
+    cognitoClientId,
+    cognitoDomain,
+    cognitoRedirectUri,
+    responseType,
+    scopes,
+  ]);
+
+  const handleLogin = useCallback(() => {
+    console.log('handleLogin')
+    if (!authorizeUrl) {
+      return;
+    }
+
+    window.location.assign(authorizeUrl);
+  }, [authorizeUrl]);
+
+  const persistTokens = useCallback((tokens: TokenBundle) => {
+    if (tokens.idToken) {
+      localStorage.setItem('cognitoIdToken', tokens.idToken);
+    }
+
+    if (tokens.accessToken) {
+      localStorage.setItem('cognitoAccessToken', tokens.accessToken);
+    }
+
+    if (tokens.refreshToken) {
+      localStorage.setItem('cognitoRefreshToken', tokens.refreshToken);
     }
   }, []);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    if (users[username] && users[username] === password) {
-      onLogin();
-      navigate('/');
-    } else {
-      alert('Invalid credentials');
-    }
-  };
+  const clearAuthParams = useCallback(() => {
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.delete('code');
+    currentUrl.searchParams.delete('state');
+    currentUrl.hash = '';
+    window.history.replaceState(null, document.title, currentUrl.toString());
+  }, []);
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      alert('Passwords do not match');
+  const exchangeCode = useCallback(
+    async (authorizationCode: string) => {
+      exchangeInFlightRef.current = true;
+      setIsProcessing(true);
+      setError(null);
+
+      console.log('going to fetch using exchange endpoint')
+
+      try {
+        const response = await fetch(exchangeEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            code: authorizationCode,
+            redirectUri: cognitoRedirectUri,
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (payload) {
+          console.log('exchange payload', payload);
+
+          if (payload.tokens) {
+            console.log('received token bundle', payload.tokens);
+          }
+
+          if (payload.user) {
+            console.log('user from cognito', payload.user);
+          }
+        }
+        if (!response.ok) {
+          const message = payload && typeof payload.error === 'string'
+            ? payload.error
+            : 'Unable to exchange authorization code. Please try again.';
+          throw new Error(message);
+        }
+
+        if (!payload?.ok || !payload.tokens) {
+          throw new Error('Cognito did not return a valid token response.');
+        }
+
+        const tokens: TokenBundle = payload.tokens;
+        persistTokens(tokens);
+
+        onLogin();
+        
+        navigate('/', { replace: true });
+      } catch (err) {
+        const message = err instanceof Error
+          ? err.message
+          : 'Unable to complete sign-in. Please try again.';
+        setError(message);
+      } finally {
+        clearAuthParams();
+        exchangeInFlightRef.current = false;
+        setIsProcessing(false);
+      }
+    },
+    [
+      clearAuthParams,
+      cognitoRedirectUri,
+      exchangeEndpoint,
+      navigate,
+      onLogin,
+      persistTokens,
+    ],
+  );
+
+  useEffect(() => {
+    const currentUrl = new URL(window.location.href);
+    const params = currentUrl.searchParams;
+    const code = params.get('code');
+
+    const hashParams = new URLSearchParams(
+      currentUrl.hash.startsWith('#')
+        ? currentUrl.hash.substring(1)
+        : currentUrl.hash,
+    );
+
+    const hasIdToken = hashParams.has('id_token');
+    if (hasIdToken) {
+      persistTokens({
+        idToken: hashParams.get('id_token'),
+        accessToken: hashParams.get('access_token'),
+        refreshToken: hashParams.get('refresh_token'),
+      });
+
+      clearAuthParams();
+      onLogin();
+      navigate('/', { replace: true });
       return;
     }
-    const users = JSON.parse(localStorage.getItem('users') || '{}');
-    if (users[username]) {
-      alert('User already exists');
-      return;
+
+    if (code && !exchangeInFlightRef.current) {
+      void exchangeCode(code);
     }
-    users[username] = password;
-    localStorage.setItem('users', JSON.stringify(users));
-    alert('Account created. You can now log in.');
-    setIsCreating(false);
-    setPassword('');
-    setConfirmPassword('');
-  };
+  }, [clearAuthParams, exchangeCode, navigate, onLogin, persistTokens]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      {isCreating ? (
-        <form onSubmit={handleCreateSubmit} className="bg-white p-6 rounded shadow w-full max-w-sm space-y-4">
-          <h1 className="text-2xl font-bold text-center">Create Account</h1>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-          <input
-            type="password"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
+      <div className="bg-white p-6 rounded shadow w-full max-w-sm space-y-4 text-center">
+        <h1 className="text-2xl font-bold">Sign in</h1>
+        {!authorizeUrl ? (
+          <p className="text-sm text-red-600">
+            Missing Cognito configuration. Ensure the environment variables for
+            the domain and client ID are set.
+          </p>
+        ) : (
           <button
-            type="submit"
-            className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            type="button"
+            onClick={handleLogin}
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            disabled={isProcessing}
           >
-            Create Account
+            Continue with Amazon Cognito
           </button>
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setIsCreating(false)}
-              className="text-blue-500 underline"
-            >
-              Back to Login
-            </button>
-          </div>
-        </form>
-      ) : (
-        <form onSubmit={handleLoginSubmit} className="bg-white p-6 rounded shadow w-full max-w-sm space-y-4">
-          <h1 className="text-2xl font-bold text-center">Login</h1>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-          />
-          <button
-            type="submit"
-            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Login
-          </button>
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsCreating(true);
-                setUsername('');
-                setPassword('');
-                setConfirmPassword('');
-              }}
-              className="text-blue-500 underline"
-            >
-              Create Account
-            </button>
-          </div>
-        </form>
-      )}
+        )}
+        {isProcessing && (
+          <p className="text-sm text-gray-600">Signing you in…</p>
+        )}
+        {isUsingFallbackRedirect && (
+          <p className="text-xs text-yellow-700 bg-yellow-100 rounded p-2">
+            Using default redirect URI <code>{cognitoRedirectUri}</code>. Define{' '}
+            <code>REACT_APP_COGNITO_REDIRECT_URI</code> in your <code>.env</code>{' '}
+            and make sure the value matches a callback URL that is registered on
+            your Cognito app client to avoid "redirect URI is not registered"
+            errors.
+          </p>
+        )}
+        {error && (
+          <p className="text-sm text-red-600">{error}</p>
+        )}
+      </div>
     </div>
   );
 };

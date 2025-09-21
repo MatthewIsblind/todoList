@@ -28,24 +28,69 @@ const App : FC = () => {
     setCookie('loggedIn', 'true', 7);
   };
 
+  const clearCookie = (name: string) => {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  };
+
+  const handleLogout = () => {
+    setLoggedIn(false);
+    localStorage.removeItem('cognitoIdToken');
+    localStorage.removeItem('cognitoAccessToken');
+    localStorage.removeItem('cognitoRefreshToken');
+    clearCookie('loggedIn');
+  };
+
+
+  const rawPublicUrl = process.env.PUBLIC_URL ?? '';
+  let resolvedBasename = rawPublicUrl;
+  if (resolvedBasename.startsWith('http')) {
+    try {
+      const parsed = new URL(resolvedBasename);
+      resolvedBasename = parsed.pathname;
+    } catch (error) {
+      resolvedBasename = '';
+    }
+  }
+
+  if (resolvedBasename && resolvedBasename !== '/') {
+    resolvedBasename = resolvedBasename.replace(/\/$/, '');
+    const currentPath = window.location.pathname;
+    if (!currentPath.startsWith(resolvedBasename)) {
+      resolvedBasename = '';
+    }
+  }
 
   return (
     <TaskProvider>
-     <Router basename={process.env.PUBLIC_URL}>
-      <Routes>
-        <Route path="/login" element={<Login onLogin={handleLogin} />} />
-        {loggedIn ? (
-            <>
-              <Route path="/" element={<Home />} />
-              <Route path="/todolist" element={<TodoList />} />
-              <Route path="/bin" element={<Bin />} />
-              <Route path="/about" element={<About />} />
-            </>
-        ):(
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        )}
-      </Routes>
-    </Router>
+      <Router basename={resolvedBasename}>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              loggedIn ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />
+            }
+          />
+          <Route
+            path="/"
+            element={
+              loggedIn ? <Home onLogout={handleLogout} /> : <Login onLogin={handleLogin} />
+            }
+          />
+          <Route
+            path="/todolist"
+            element={loggedIn ? <TodoList /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/bin"
+            element={loggedIn ? <Bin /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/about"
+            element={loggedIn ? <About /> : <Navigate to="/login" replace />}
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
     </TaskProvider>
   );
 }
