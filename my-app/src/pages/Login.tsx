@@ -8,64 +8,119 @@ import React, {
 import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (useremail? : string|null) => void;
 }
+
+type JwtPayload = Record<string, unknown>;
+
+const decodeJwtPayload = (token: string): JwtPayload | null => {
+  const segments = token.split('.');
+  if (segments.length < 2) {
+    return null;
+  }
+
+  const base64 = segments[1].replace(/-/g, '+').replace(/_/g, '/');
+  const padding = base64.length % 4 === 0 ? '' : '='.repeat(4 - (base64.length % 4));
+
+  try {
+    const json = window.atob(`${base64}${padding}`);
+    return JSON.parse(json) as JwtPayload;
+  } catch (error) {
+    console.warn('Unable to decode ID token payload', error);
+    return null;
+  }
+};
+
+const extractEmailFromIdToken = (idToken?: string | null): string | null => {
+  if (!idToken) {
+    return null;
+  }
+
+  const payload = decodeJwtPayload(idToken);
+  if (!payload) {
+    return null;
+  }
+
+  const email = payload.email;
+  if (typeof email === 'string' && email.length > 0) {
+    return email;
+  }
+
+  const preferredUsername = payload.preferred_username;
+  if (typeof preferredUsername === 'string' && preferredUsername.length > 0) {
+    return preferredUsername;
+  }
+
+  const cognitoUsername = payload['cognito:username'];
+  if (typeof cognitoUsername === 'string' && cognitoUsername.length > 0) {
+    return cognitoUsername;
+  }
+
+  return null;
+};
+
+
+const parseRedirectUris = (): string[] => {
+  const raw =
+    process.env.REACT_APP_COGNITO_REDIRECT_URI ??
+    process.env.COGNITO_REDIRECT_URI ??
+    '';
+
+  return raw
+    .split(',')
+    .map((entry) => {
+      let cleaned = entry.trim();
+      if (!cleaned) {
+        return '';
+      }
+
+      const prefix = 'COGNITO_REDIRECT_URI=';
+      let warned = false;
+      while (cleaned.toUpperCase().startsWith(prefix)) {
+        cleaned = cleaned.slice(prefix.length).trimStart();
+        warned = true;
+      }
+
+      if (warned) {
+        console.warn(
+          "Ignoring duplicated 'COGNITO_REDIRECT_URI=' prefix in redirect URI configuration. " +
+            'Update your .env file to contain only the comma-separated list of callback URLs.',
+        );
+      }
+
+      return cleaned;
+    })
+    .filter((uri) => uri.length > 0);
+};
+
+const pickRedirectUri = (configuredRedirectUris: string[]): string => {
+  if (configuredRedirectUris.length === 0) {
+    return `${window.location.origin}/`;
+  }
+
+  const currentOrigin = window.location.origin;
+  const matchingUri = configuredRedirectUris.find((uri) => {
+    try {
+      return new URL(uri).origin === currentOrigin;
+    } catch (error) {
+      console.warn('Ignoring invalid redirect URI from configuration:', uri, error);
+      return false;
+    }
+  });
+
+  return matchingUri ?? configuredRedirectUris[0];
+};
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const navigate = useNavigate();
 
   const cognitoDomain = process.env.REACT_APP_COGNITO_DOMAIN;
   const cognitoClientId = process.env.REACT_APP_COGNITO_CLIENT_ID;
-  const configuredRedirectUris = useMemo<string[]>(() => {
-    const raw = process.env.COGNITO_REDIRECT_URI;
-    if (!raw) {
-      return [];
-    }
-
-    return raw
-      .split(',')
-      .map((entry) => {
-        let cleaned = entry.trim();
-        if (!cleaned) {
-          return '';
-        }
-
-        const prefix = 'COGNITO_REDIRECT_URI=';
-        let warned = false;
-        while (cleaned.toUpperCase().startsWith(prefix)) {
-          cleaned = cleaned.slice(prefix.length).trimStart();
-          warned = true;
-        }
-
-        if (warned) {
-          console.warn(
-            "Ignoring duplicated 'COGNITO_REDIRECT_URI=' prefix in redirect URI configuration. " +
-              'Update your .env file to contain only the comma-separated list of callback URLs.',
-          );
-        }
-
-        return cleaned;
-      })
-      .filter((uri) => uri.length > 0);
-  }, []);
-
-  const cognitoRedirectUri = useMemo(() => {
-    if (configuredRedirectUris.length === 0) {
-      return `${window.location.origin}/`;
-    }
-
-    const currentOrigin = window.location.origin;
-    const matchingUri = configuredRedirectUris.find((uri) => {
-      try {
-        return new URL(uri).origin === currentOrigin;
-      } catch (error) {
-        console.warn('Ignoring invalid redirect URI from configuration:', uri, error);
-        return false;
-      }
-    });
-
-    return matchingUri ?? configuredRedirectUris[0];
-  }, [configuredRedirectUris]);
+  const configuredRedirectUris = useMemo(() => parseRedirectUris(), []);
+  const cognitoRedirectUri = useMemo(
+    () => pickRedirectUri(configuredRedirectUris),
+    [configuredRedirectUris],
+  );
   const isUsingFallbackRedirect = configuredRedirectUris.length === 0;
 
   const responseType = process.env.REACT_APP_COGNITO_RESPONSE_TYPE ?? 'code';
@@ -77,7 +132,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const exchangeInFlightRef = useRef(false);
 
   const exchangeEndpoint = `${apiBaseUrl}/auth/exchange`;
-  
+
   type TokenBundle = {
     idToken?: string | null;
     accessToken?: string | null;
@@ -187,8 +242,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         const tokens: TokenBundle = payload.tokens;
         persistTokens(tokens);
 
-        onLogin();
-        
+        onLogin(payload.user.email);
+
         navigate('/', { replace: true });
       } catch (err) {
         const message = err instanceof Error
@@ -224,14 +279,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     const hasIdToken = hashParams.has('id_token');
     if (hasIdToken) {
+      const idToken = hashParams.get('id_token');
       persistTokens({
-        idToken: hashParams.get('id_token'),
+        idToken,
         accessToken: hashParams.get('access_token'),
         refreshToken: hashParams.get('refresh_token'),
       });
 
       clearAuthParams();
-      onLogin();
+      onLogin(extractEmailFromIdToken(idToken));
       navigate('/', { replace: true });
       return;
     }

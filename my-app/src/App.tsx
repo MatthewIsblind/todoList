@@ -7,6 +7,51 @@ import About from './pages/About';
 import Bin from './pages/Bin';
 import Login from './pages/Login';
 
+const selectConfiguredRedirectUris = (): string[] => {
+  const raw =
+    process.env.REACT_APP_COGNITO_LOGOUT_REDIRECT_URI ??
+    process.env.REACT_APP_COGNITO_REDIRECT_URI ??
+    process.env.COGNITO_REDIRECT_URI ??
+    '';
+
+  return raw
+    .split(',')
+    .map((uri) => uri.trim())
+    .filter((uri) => uri.length > 0);
+};
+
+const pickLogoutRedirectUri = (): string => {
+  const configured = selectConfiguredRedirectUris();
+  if (configured.length > 0) {
+    return configured[0];
+  }
+
+  if (typeof window !== 'undefined' && window.location) {
+    return `${window.location.origin}/`;
+  }
+
+  return '/';
+};
+
+const buildHostedLogoutUrl = (
+  domain: string | undefined,
+  clientId: string | undefined,
+  logoutRedirectUri: string,
+): string | undefined => {
+  if (!domain || !clientId) {
+    return undefined;
+  }
+
+  const normalizedDomain = domain.endsWith('/') ? domain.slice(0, -1) : domain;
+  const params = new URLSearchParams({
+    client_id: clientId,
+    logout_uri: logoutRedirectUri,
+  });
+
+  return `${normalizedDomain}/logout?${params.toString()}`;
+};
+
+
 const App : FC = () => {
 
   const getCookie = (name: string): string | null => {
@@ -19,15 +64,25 @@ const App : FC = () => {
     document.cookie = `${name}=${value}; expires=${expires}; path=/`;
   };
 
+  const [userEmail, setUserEmail] = useState<string | null>('');
+
   const [loggedIn, setLoggedIn] = useState<boolean>(() => {
     return getCookie('loggedIn') === 'true';
   });
 
-  const handleLogin = () => {
+  const handleLogin = (email?: string | null) => {
     setLoggedIn(true);
     setCookie('loggedIn', 'true', 7);
-  };
 
+    if (email) {
+      setCookie('userEmail', email, 7);
+      setUserEmail(email);
+    } else {
+      
+      setUserEmail(null);
+    }
+  }
+  
   const clearCookie = (name: string) => {
     document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
   };
@@ -38,6 +93,18 @@ const App : FC = () => {
     localStorage.removeItem('cognitoAccessToken');
     localStorage.removeItem('cognitoRefreshToken');
     clearCookie('loggedIn');
+    setUserEmail(null);
+
+    const logoutRedirectUri = pickLogoutRedirectUri();
+    const hostedLogoutUrl = buildHostedLogoutUrl(
+      process.env.REACT_APP_COGNITO_DOMAIN,
+      process.env.REACT_APP_COGNITO_CLIENT_ID,
+      logoutRedirectUri,
+    );
+
+    if (hostedLogoutUrl) {
+      window.location.assign(hostedLogoutUrl);
+    }
   };
 
 
@@ -60,9 +127,14 @@ const App : FC = () => {
     }
   }
 
+  
+
   return (
     <TaskProvider>
       <Router basename={resolvedBasename}>
+        {loggedIn && userEmail ? (
+          <div className="text-center py-2 bg-blue-50 text-blue-700">Signed in as {userEmail}</div>
+        ) : null}
         <Routes>
           <Route
             path="/login"

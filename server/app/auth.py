@@ -121,8 +121,11 @@ def fetch_userinfo(access_token: str) -> Dict[str, Any]:
     except ValueError as exc:  # pragma: no cover - defensive coding
         raise UserInfoError("Cognito userInfo response was not valid JSON.") from exc
 
+CLOCK_SKEW_LEEWAY = 60
+
 
 def validate_id_token(id_token: str) -> Dict[str, Any]:
+
     """Validate the provided Cognito ID token.
 
     Args:
@@ -151,7 +154,14 @@ def validate_id_token(id_token: str) -> Dict[str, Any]:
             algorithms=["RS256"],
             issuer=settings.issuer,
             audience=settings.cognito_client_id,
+            leeway=CLOCK_SKEW_LEEWAY,
         )
+    except (ImmatureSignatureError, InvalidIssuedAtError) as exc:
+        logger.debug("ID token rejected due to clock skew: %s", exc)
+        raise TokenVerificationError(
+            "Unable to verify token because it appears to be issued in the future. "
+            "Check that the server clock is in sync."
+        ) from exc
     except InvalidTokenError as exc:
         logger.debug("Failed to decode JWT: %s", exc)
         raise TokenVerificationError("Unable to verify token.") from exc

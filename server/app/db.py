@@ -34,6 +34,19 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT NOT NULL,
+                date TEXT NOT NULL,
+                time TEXT NOT NULL,
+                user_email TEXT NOT NULL,
+                isactive INTEGER NOT NULL DEFAULT 1
+            )
+            """
+        )
+       
         connection.commit()
 
 
@@ -81,3 +94,4 @@ def upsert_user(payload: Dict[str, Any]) -> Dict[str, Any]:
             connection.commit()
 
     return user
+
