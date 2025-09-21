@@ -89,8 +89,10 @@ def _exchange_code(code: str, redirect_uri: str | None) -> Tuple[Dict[str, Any],
         "Exchanging authorization code for tokens (redirect_uri=%s)",
         redirect_uri or "<default>",
     )
+    
     tokens = exchange_code_for_tokens(code, redirect_uri)
     id_token = tokens.get("id_token")
+    
     if not id_token:
         raise TokenExchangeError("Cognito token response did not include an id_token.")
 

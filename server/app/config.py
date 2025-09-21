@@ -78,6 +78,37 @@ def _parse_allowed_origins(raw_origins: str | None) -> List[str]:
     origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
     return origins or ["*"]
 
+def _normalise_redirect_uri(raw_uri: str) -> str | None:
+    """Return a cleaned redirect URI value.
+
+    Users occasionally copy environment-variable assignments verbatim into the
+    value field (e.g. ``COGNITO_REDIRECT_URI=COGNITO_REDIRECT_URI=http://...``),
+    which results in entries like ``"COGNITO_REDIRECT_URI=http://..."``. That
+    value will never match the redirect URI Cognito sends back, so we strip the
+    redundant prefix and emit a warning to help them fix the configuration.
+    """
+
+    cleaned = raw_uri.strip()
+    if not cleaned:
+        return None
+
+    prefix = "COGNITO_REDIRECT_URI="
+    warned = False
+    # Remove any number of duplicated assignments (users sometimes paste the
+    # variable name multiple times).
+    while cleaned.upper().startswith(prefix):
+        cleaned = cleaned[len(prefix) :].lstrip()
+        warned = True
+
+    if warned:
+        logger.warning(
+            "Stripping nested 'COGNITO_REDIRECT_URI=' prefix from redirect URI "
+            "entry. Update your environment variable to remove the duplicated "
+            "assignment."
+        )
+
+    return cleaned or None
+
 def _parse_redirect_uris(raw_uris: str) -> Tuple[str, ...]:
     uris = [uri.strip() for uri in raw_uris.split(",") if uri.strip()]
     if not uris:

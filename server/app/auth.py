@@ -49,13 +49,22 @@ def _raise_for_status(response: Response, message: str) -> None:
 
 def exchange_code_for_tokens(code: str, redirect_uri: str | None = None) -> Dict[str, Any]:
     """Exchange an authorization code for Cognito tokens."""
-
     settings: Settings = get_settings()
     redirect_target = redirect_uri or settings.cognito_redirect_uri
 
     if redirect_target not in settings.cognito_redirect_uris:
-        raise TokenExchangeError("Received redirect URI does not match configured value.")
-
+        configured_list = ", ".join(settings.cognito_redirect_uris)
+        logger.debug(
+            "Rejecting token exchange because redirect URI %s is not in configured list: %s",
+            redirect_target,
+            configured_list,
+        )
+        raise TokenExchangeError(
+            "Received redirect URI does not match configured value. "
+            "Expected one of: "
+            f"{configured_list}"
+        )
+    
     data = {
         "grant_type": "authorization_code",
         "client_id": settings.cognito_client_id,
@@ -125,7 +134,7 @@ def validate_id_token(id_token: str) -> Dict[str, Any]:
     Raises:
         TokenVerificationError: If the token cannot be verified.
     """
-
+    
     settings: Settings = get_settings()
     jwk_client = _get_jwk_client(settings.jwks_uri)
 

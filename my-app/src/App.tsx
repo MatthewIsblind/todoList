@@ -34,6 +34,9 @@ const App : FC = () => {
 
   const handleLogout = () => {
     setLoggedIn(false);
+    localStorage.removeItem('cognitoIdToken');
+    localStorage.removeItem('cognitoAccessToken');
+    localStorage.removeItem('cognitoRefreshToken');
     clearCookie('loggedIn');
   };
 

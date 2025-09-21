@@ -24,7 +24,28 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     return raw
       .split(',')
-      .map((uri) => uri.trim())
+      .map((entry) => {
+        let cleaned = entry.trim();
+        if (!cleaned) {
+          return '';
+        }
+
+        const prefix = 'COGNITO_REDIRECT_URI=';
+        let warned = false;
+        while (cleaned.toUpperCase().startsWith(prefix)) {
+          cleaned = cleaned.slice(prefix.length).trimStart();
+          warned = true;
+        }
+
+        if (warned) {
+          console.warn(
+            "Ignoring duplicated 'COGNITO_REDIRECT_URI=' prefix in redirect URI configuration. " +
+              'Update your .env file to contain only the comma-separated list of callback URLs.',
+          );
+        }
+
+        return cleaned;
+      })
       .filter((uri) => uri.length > 0);
   }, []);
 
@@ -140,10 +161,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           }),
         });
 
-        console.log('get response',response)
-
         const payload = await response.json().catch(() => null);
+        if (payload) {
+          console.log('exchange payload', payload);
 
+          if (payload.tokens) {
+            console.log('received token bundle', payload.tokens);
+          }
+
+          if (payload.user) {
+            console.log('user from cognito', payload.user);
+          }
+        }
         if (!response.ok) {
           const message = payload && typeof payload.error === 'string'
             ? payload.error
@@ -159,7 +188,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         persistTokens(tokens);
 
         onLogin();
-        console.log('nagivate')
+        
         navigate('/', { replace: true });
       } catch (err) {
         const message = err instanceof Error
