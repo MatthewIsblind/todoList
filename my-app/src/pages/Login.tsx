@@ -11,61 +11,67 @@ interface LoginProps {
   onLogin: () => void;
 }
 
+const parseRedirectUris = (): string[] => {
+  const raw =
+    process.env.REACT_APP_COGNITO_REDIRECT_URI ??
+    process.env.COGNITO_REDIRECT_URI ??
+    '';
+
+  return raw
+    .split(',')
+    .map((entry) => {
+      let cleaned = entry.trim();
+      if (!cleaned) {
+        return '';
+      }
+
+      const prefix = 'COGNITO_REDIRECT_URI=';
+      let warned = false;
+      while (cleaned.toUpperCase().startsWith(prefix)) {
+        cleaned = cleaned.slice(prefix.length).trimStart();
+        warned = true;
+      }
+
+      if (warned) {
+        console.warn(
+          "Ignoring duplicated 'COGNITO_REDIRECT_URI=' prefix in redirect URI configuration. " +
+            'Update your .env file to contain only the comma-separated list of callback URLs.',
+        );
+      }
+
+      return cleaned;
+    })
+    .filter((uri) => uri.length > 0);
+};
+
+const pickRedirectUri = (configuredRedirectUris: string[]): string => {
+  if (configuredRedirectUris.length === 0) {
+    return `${window.location.origin}/`;
+  }
+
+  const currentOrigin = window.location.origin;
+  const matchingUri = configuredRedirectUris.find((uri) => {
+    try {
+      return new URL(uri).origin === currentOrigin;
+    } catch (error) {
+      console.warn('Ignoring invalid redirect URI from configuration:', uri, error);
+      return false;
+    }
+  });
+
+  return matchingUri ?? configuredRedirectUris[0];
+};
+
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const navigate = useNavigate();
 
   const cognitoDomain = process.env.REACT_APP_COGNITO_DOMAIN;
   const cognitoClientId = process.env.REACT_APP_COGNITO_CLIENT_ID;
-  const configuredRedirectUris = useMemo<string[]>(() => {
-    const raw = process.env.COGNITO_REDIRECT_URI;
-    if (!raw) {
-      return [];
-    }
-
-    return raw
-      .split(',')
-      .map((entry) => {
-        let cleaned = entry.trim();
-        if (!cleaned) {
-          return '';
-        }
-
-        const prefix = 'COGNITO_REDIRECT_URI=';
-        let warned = false;
-        while (cleaned.toUpperCase().startsWith(prefix)) {
-          cleaned = cleaned.slice(prefix.length).trimStart();
-          warned = true;
-        }
-
-        if (warned) {
-          console.warn(
-            "Ignoring duplicated 'COGNITO_REDIRECT_URI=' prefix in redirect URI configuration. " +
-              'Update your .env file to contain only the comma-separated list of callback URLs.',
-          );
-        }
-
-        return cleaned;
-      })
-      .filter((uri) => uri.length > 0);
-  }, []);
-
-  const cognitoRedirectUri = useMemo(() => {
-    if (configuredRedirectUris.length === 0) {
-      return `${window.location.origin}/`;
-    }
-
-    const currentOrigin = window.location.origin;
-    const matchingUri = configuredRedirectUris.find((uri) => {
-      try {
-        return new URL(uri).origin === currentOrigin;
-      } catch (error) {
-        console.warn('Ignoring invalid redirect URI from configuration:', uri, error);
-        return false;
-      }
-    });
-
-    return matchingUri ?? configuredRedirectUris[0];
-  }, [configuredRedirectUris]);
+  const configuredRedirectUris = useMemo(() => parseRedirectUris(), []);
+  const cognitoRedirectUri = useMemo(
+    () => pickRedirectUri(configuredRedirectUris),
+    [configuredRedirectUris],
+  );
   const isUsingFallbackRedirect = configuredRedirectUris.length === 0;
 
   const responseType = process.env.REACT_APP_COGNITO_RESPONSE_TYPE ?? 'code';
@@ -77,7 +83,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const exchangeInFlightRef = useRef(false);
 
   const exchangeEndpoint = `${apiBaseUrl}/auth/exchange`;
-  
+
   type TokenBundle = {
     idToken?: string | null;
     accessToken?: string | null;
@@ -188,7 +194,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         persistTokens(tokens);
 
         onLogin();
-        
+
         navigate('/', { replace: true });
       } catch (err) {
         const message = err instanceof Error

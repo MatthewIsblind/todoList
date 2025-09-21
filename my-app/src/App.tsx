@@ -7,6 +7,51 @@ import About from './pages/About';
 import Bin from './pages/Bin';
 import Login from './pages/Login';
 
+const selectConfiguredRedirectUris = (): string[] => {
+  const raw =
+    process.env.REACT_APP_COGNITO_LOGOUT_REDIRECT_URI ??
+    process.env.REACT_APP_COGNITO_REDIRECT_URI ??
+    process.env.COGNITO_REDIRECT_URI ??
+    '';
+
+  return raw
+    .split(',')
+    .map((uri) => uri.trim())
+    .filter((uri) => uri.length > 0);
+};
+
+const pickLogoutRedirectUri = (): string => {
+  const configured = selectConfiguredRedirectUris();
+  if (configured.length > 0) {
+    return configured[0];
+  }
+
+  if (typeof window !== 'undefined' && window.location) {
+    return `${window.location.origin}/`;
+  }
+
+  return '/';
+};
+
+const buildHostedLogoutUrl = (
+  domain: string | undefined,
+  clientId: string | undefined,
+  logoutRedirectUri: string,
+): string | undefined => {
+  if (!domain || !clientId) {
+    return undefined;
+  }
+
+  const normalizedDomain = domain.endsWith('/') ? domain.slice(0, -1) : domain;
+  const params = new URLSearchParams({
+    client_id: clientId,
+    logout_uri: logoutRedirectUri,
+  });
+
+  return `${normalizedDomain}/logout?${params.toString()}`;
+};
+
+
 const App : FC = () => {
 
   const getCookie = (name: string): string | null => {
@@ -38,6 +83,16 @@ const App : FC = () => {
     localStorage.removeItem('cognitoAccessToken');
     localStorage.removeItem('cognitoRefreshToken');
     clearCookie('loggedIn');
+    const logoutRedirectUri = pickLogoutRedirectUri();
+    const hostedLogoutUrl = buildHostedLogoutUrl(
+      process.env.REACT_APP_COGNITO_DOMAIN,
+      process.env.REACT_APP_COGNITO_CLIENT_ID,
+      logoutRedirectUri,
+    );
+
+    if (hostedLogoutUrl) {
+      window.location.assign(hostedLogoutUrl);
+    }
   };
 
 
