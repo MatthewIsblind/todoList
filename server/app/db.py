@@ -13,6 +13,9 @@ DATABASE_PATH = DATA_DIRECTORY / "app.db"
 
 _DB_LOCK = Lock()
 
+class DatabaseError(RuntimeError):
+    """Raised when a database operation fails."""
+
 
 def init_db() -> None:
     """Ensure the SQLite database and users table exist."""
@@ -34,19 +37,6 @@ def init_db() -> None:
             )
             """
         )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                description TEXT NOT NULL,
-                date TEXT NOT NULL,
-                time TEXT NOT NULL,
-                user_email TEXT NOT NULL,
-                isactive INTEGER NOT NULL DEFAULT 1
-            )
-            """
-        )
-       
         connection.commit()
 
 
@@ -95,3 +85,37 @@ def upsert_user(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     return user
 
+
+def insert_task(
+    description: str,
+    task_date: str,
+    task_time: str,
+    user_email: str | None,
+) -> Tuple[int, str | None]:
+    """Insert a task row and return its identifier and normalized email."""
+
+    insert_sql = (
+        "INSERT INTO tasks (description, date, time, user_email, isactive) "
+        "VALUES (?, ?, ?, ?, 1)"
+    )
+    normalized_email = (user_email or "").strip()
+    print("this is the email: + " + str(normalized_email))
+    try:
+        with _DB_LOCK:
+            with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+                # Parameter binding avoids SQL injection by keeping user input separate
+                # from the SQL statement itself.
+                cursor = connection.execute(
+                    insert_sql,
+                    (
+                        description,
+                        task_date,
+                        task_time,
+                        normalized_email,
+                    ),
+                )
+                connection.commit()
+    except sqlite3.Error as exc:  # pragma: no cover - defensive
+        raise DatabaseError("Failed to insert task") from exc
+
+    return cursor.lastrowid, (normalized_email or None)

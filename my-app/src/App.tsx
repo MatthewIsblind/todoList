@@ -93,6 +93,7 @@ const App : FC = () => {
     localStorage.removeItem('cognitoAccessToken');
     localStorage.removeItem('cognitoRefreshToken');
     clearCookie('loggedIn');
+    clearCookie('userEmail');
     setUserEmail(null);
 
     const logoutRedirectUri = pickLogoutRedirectUri();

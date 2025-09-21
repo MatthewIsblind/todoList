@@ -6,10 +6,16 @@ export interface InputContainerProps {
   selectedDate: string;
 }
 
+const getCookie = (name: string): string |null  => {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : null
+};
+
 
 const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
     const { addTask } = useTasks();
-
+    
+    
     const [description, setDescription] = useState<string>('');
     const [time, setTime] = useState<string>('');
     const [error, setError] = useState<string>('');
@@ -18,6 +24,8 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
     // The conditiational check what input fields has been changed and will change 
     // the state base on what the input fields is
     const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
+        const userEmail = getCookie('userEmail');
+        console.log("useremail",userEmail);
         if (event.target.name === 'description') {
             setDescription(event.target.value);
         } else if (event.target.name === 'time') {
@@ -28,21 +36,71 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
         }
     };
     
-    const addTaskHandler = (): void => {
+    const apiBaseUrl = process.env.REACT_APP_API_BASE_URL?.replace(/\/$/, '') ?? '';
+    const saveTaskCallUrl = `${apiBaseUrl}/tasks/addTask`;
+
+    
+    const getCookie = (name: string): string | null => {
+        const match = document.cookie.match(new RegExp(`(^|;\\s*)${name}=([^;]+)`));
+        return match ? decodeURIComponent(match[2]) : null;
+    };
+
+    const addTaskHandler = async (): Promise<void> => {
         if (!description.trim() || !time.trim()) {
             setError('Both description and time are required.');
             return;
         }
+        
         const newTask: ITask = {
             id: Date.now(),
             description,
             time,
             date: selectedDate,
         };
+        
+        const userEmail = getCookie('userEmail') 
+        const payload = {
+            id: Date.now(),
+            description,
+            time,
+            date: selectedDate,
+            user_email : userEmail
+        };
+
         addTask(selectedDate, newTask);
         setDescription('');
         setTime('');
         setError('');
+
+        try {
+            const response = await fetch(saveTaskCallUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`);
+            }
+
+            const savedTask = (await response.json()) as Partial<ITask> & { id?: number };
+            const taskToAdd: ITask = {
+                id: savedTask.id ?? newTask.id,
+                description: savedTask.description ?? newTask.description,
+                time: savedTask.time ?? newTask.time,
+                date: savedTask.date ?? newTask.date,
+            };
+
+            setDescription('');
+            setTime('');
+            setError('');
+        } catch (fetchError) {
+            console.error('Failed to save task', fetchError);
+            setError('Failed to save task. Please try again.');
+        }
     };
 
         return (

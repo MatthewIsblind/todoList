@@ -125,7 +125,7 @@ CLOCK_SKEW_LEEWAY = 60
 
 
 def validate_id_token(id_token: str) -> Dict[str, Any]:
-
+    
     """Validate the provided Cognito ID token.
 
     Args:
