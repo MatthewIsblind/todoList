@@ -35,7 +35,9 @@ const TodoList: FC = () => {
   }, [selectedDate, fetchTasksForDate]);
 
   const handleDelete = (taskId: number): void => {
-    deleteTask(selectedDate, taskId);
+    deleteTask(selectedDate, taskId).catch(error => {
+      console.error('Unable to delete task', error);
+    });
   };
 
    useEffect(() => {

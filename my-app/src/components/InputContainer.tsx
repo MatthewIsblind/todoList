@@ -1,5 +1,5 @@
 import React, {FC,ChangeEvent,useState, useEffect} from 'react';
-import {ITask} from '../Interfaces';
+import {ITask,TaskResponse} from '../Interfaces';
 import { useTasks } from '../TasksContext';
 
 export interface InputContainerProps {
@@ -25,7 +25,6 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
     // the state base on what the input fields is
     const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
         const userEmail = getCookie('userEmail');
-        console.log("useremail",userEmail);
         if (event.target.name === 'description') {
             setDescription(event.target.value);
         } else if (event.target.name === 'time') {
@@ -51,13 +50,6 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
             return;
         }
         
-        const newTask: ITask = {
-            id: Date.now(),
-            description,
-            time,
-            date: selectedDate,
-        };
-        
         const userEmail = getCookie('userEmail') 
         const payload = {
             id: Date.now(),
@@ -66,11 +58,6 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
             date: selectedDate,
             user_email : userEmail
         };
-
-        addTask(selectedDate, newTask);
-        setDescription('');
-        setTime('');
-        setError('');
 
         try {
             const response = await fetch(saveTaskCallUrl, {
@@ -85,14 +72,18 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
             if (!response.ok) {
                 throw new Error(`Request failed with status ${response.status}`);
             }
-
-            const savedTask = (await response.json()) as Partial<ITask> & { id?: number };
-            const taskToAdd: ITask = {
-                id: savedTask.id ?? newTask.id,
-                description: savedTask.description ?? newTask.description,
-                time: savedTask.time ?? newTask.time,
-                date: savedTask.date ?? newTask.date,
+             
+            const savedTask = (await response.json() as TaskResponse) 
+            console.log('response is ', savedTask );
+            
+            const newTask: ITask = {
+                id: savedTask.id,   
+                description : savedTask.description,
+                time : savedTask.time,
+                date: savedTask.date
             };
+
+            addTask(selectedDate,newTask)
 
             setDescription('');
             setTime('');

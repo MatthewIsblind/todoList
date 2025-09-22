@@ -8,7 +8,7 @@ from contextlib import closing
 from datetime import date as date_cls, time as time_cls
 from typing import Any, Dict, Tuple
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query,Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -26,6 +26,7 @@ from .config import get_settings
 
 from .db import (
     DatabaseError,
+    deactivate_task,
     fetch_tasks_by_email_and_date,
     init_db,
     insert_task,
@@ -292,5 +293,19 @@ def list_tasks(
     ]
 
     return [task.model_dump() for task in task_models]
+
+@app.delete("/tasks/deleteTask", status_code=204)
+def delete_task(task_id: int) -> Response:
+    """Mark a task as deleted by setting its ``isactive`` flag to 0."""
+    logger.info('Delete task with id ' + str(task_id))
+    try:
+        deleted = deactivate_task(task_id)
+    except DatabaseError as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail="Failed to delete task.") from exc
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Task not found.")
+
+    return Response(status_code=204)
 
 __all__ = ["app"]

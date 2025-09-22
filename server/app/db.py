@@ -156,3 +156,24 @@ def fetch_tasks_by_email_and_date(
         }
         for row in rows
     ]
+
+
+
+def deactivate_task(task_id: int) -> bool:
+    """Mark a task as inactive.
+
+    Returns ``True`` when a row is updated and ``False`` when no matching task
+    exists.
+    """
+    
+    query = "UPDATE tasks SET isactive = 0 WHERE id = ? AND isactive = 1"
+
+    try:
+        with _DB_LOCK:
+            with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+                cursor = connection.execute(query, (task_id,))
+                connection.commit()
+    except sqlite3.Error as exc:  # pragma: no cover - defensive
+        raise DatabaseError("Failed to delete task") from exc
+
+    return cursor.rowcount > 0

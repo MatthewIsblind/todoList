@@ -4,7 +4,7 @@ import { ITask } from './Interfaces';
 interface TaskContextType {
   tasksByDate: Record<string, ITask[]>;
   addTask: (date: string, task: ITask) => void;
-  deleteTask: (date: string, id: number) => void;
+  deleteTask: (date: string, id: number) => Promise<void>
   getTasks: (date: string) => ITask[];
   getTasksByDate: () => Record<string, ITask[]>;
   fetchTasksForDate: (date: string) => Promise<ITask[]>;
@@ -29,12 +29,46 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const deleteTask = (date: string, id: number) => {
-    setTasksByDate(prev => {
-      const list = prev[date] || [];
-      return { ...prev, [date]: list.filter(t => t.id !== id) };
-    });
-  };
+
+  const deleteTask = useCallback(
+    async (date: string, task_id: number) => {
+      
+      const query = new URLSearchParams({ task_id: task_id.toString() });
+      const endpoint = `${apiBaseUrl}/tasks/deleteTask?${query.toString()}`;
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+
+        if (response.status === 404) {
+          // Task already removed on the server; ensure it is cleared locally too.
+          setTasksByDate(prev => {
+            const list = prev[date] || [];
+            return { ...prev, [date]: list.filter(t => t.id !== task_id) };
+          });
+          return;
+        }
+
+        if (response.status !== 204 && !response.ok) {
+          const errorMessage = await response.text().catch(() => '');
+          throw new Error(
+            errorMessage || `Request failed with status ${response.status}`,
+          );
+        }
+
+        setTasksByDate(prev => {
+          const list = prev[date] || [];
+          return { ...prev, [date]: list.filter(t => t.id !== task_id) };
+        });
+      } catch (error) {
+        console.error('Failed to delete task', error);
+        throw error;
+      }
+    },
+    [apiBaseUrl],
+  );
 
   const getTasks = (date: string) => {
     return tasksByDate[date] || [];
