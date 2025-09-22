@@ -64,7 +64,14 @@ const App : FC = () => {
     document.cookie = `${name}=${value}; expires=${expires}; path=/`;
   };
 
-  const [userEmail, setUserEmail] = useState<string | null>('');
+  const clearCookie = (name: string) => {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  };
+
+  const [userEmail, setUserEmail] = useState<string | null>(() => {
+    const cookieEmail = getCookie('userEmail');
+    return cookieEmail && cookieEmail.trim().length > 0 ? cookieEmail : null;
+  });
 
   const [loggedIn, setLoggedIn] = useState<boolean>(() => {
     return getCookie('loggedIn') === 'true';
@@ -74,17 +81,14 @@ const App : FC = () => {
     setLoggedIn(true);
     setCookie('loggedIn', 'true', 7);
 
-    if (email) {
-      setCookie('userEmail', email, 7);
-      setUserEmail(email);
+    if (email && email.trim().length > 0) {
+      const normalizedEmail = email.trim();
+      setCookie('userEmail', normalizedEmail, 7);
+      setUserEmail(normalizedEmail);
     } else {
-      
+      clearCookie('userEmail');
       setUserEmail(null);
     }
-  }
-  
-  const clearCookie = (name: string) => {
-    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
   };
 
   const handleLogout = () => {
@@ -93,6 +97,7 @@ const App : FC = () => {
     localStorage.removeItem('cognitoAccessToken');
     localStorage.removeItem('cognitoRefreshToken');
     clearCookie('loggedIn');
+    clearCookie('userEmail');
     setUserEmail(null);
 
     const logoutRedirectUri = pickLogoutRedirectUri();
@@ -150,7 +155,9 @@ const App : FC = () => {
           />
           <Route
             path="/todolist"
-            element={loggedIn ? <TodoList /> : <Navigate to="/login" replace />}
+            element={
+              loggedIn ? <TodoList userEmail={userEmail} /> : <Navigate to="/login" replace />
+            }
           />
           <Route
             path="/bin"

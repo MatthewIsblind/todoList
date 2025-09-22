@@ -1,15 +1,16 @@
-"""FastAPI entrypoint for the todoList authentication service."""
+"""FastAPI entrypoint for the todoList authentication and tasks service."""
 
 from __future__ import annotations
 
 import logging
+from datetime import date as date_cls, time as time_cls
 from typing import Any, Dict, Tuple
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from .auth import (
     TokenExchangeError,
@@ -20,7 +21,7 @@ from .auth import (
     validate_id_token,
 )
 from .config import get_settings
-from .db import init_db, upsert_user
+from .db import DatabaseError, init_db, insert_task, upsert_user
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,6 +69,59 @@ class ExchangeResponse(BaseModel):
     user: Dict[str, Any]
 
 
+class TaskCreate(BaseModel):
+    id: int | None = None
+    description: str = Field(min_length=1)
+    date: str
+    time: str
+    user_email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("user_email", "email"),
+        serialization_alias="user_email",
+    )
+
+    @field_validator("description")
+    @classmethod
+    def _strip_description(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("description must not be empty")
+        return stripped
+
+    @field_validator("date")
+    @classmethod
+    def _normalize_date(cls, value: str) -> str:
+        try:
+            normalized = date_cls.fromisoformat(value)
+        except ValueError as exc:  # pragma: no cover - defensive against user input
+            raise ValueError("date must be in YYYY-MM-DD format") from exc
+        return normalized.isoformat()
+
+    @field_validator("time")
+    @classmethod
+    def _normalize_time(cls, value: str) -> str:
+        try:
+            normalized = time_cls.fromisoformat(value)
+        except ValueError as exc:  # pragma: no cover - defensive against user input
+            raise ValueError("time must be in HH:MM or HH:MM:SS format") from exc
+
+        # Omit seconds when they are not supplied so the response matches the
+        # frontend's expected HH:MM shape.
+        return (
+            normalized.strftime("%H:%M:%S")
+            if normalized.second
+            else normalized.strftime("%H:%M")
+        )
+
+
+class TaskResponse(BaseModel):
+    id: int
+    description: str
+    date: str
+    time: str
+    user_email: str | None = None
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     """Health check endpoint."""
@@ -89,16 +143,16 @@ def _exchange_code(code: str, redirect_uri: str | None) -> Tuple[Dict[str, Any],
         "Exchanging authorization code for tokens (redirect_uri=%s)",
         redirect_uri or "<default>",
     )
-    
+
     tokens = exchange_code_for_tokens(code, redirect_uri)
     id_token = tokens.get("id_token")
-    
+
     if not id_token:
         raise TokenExchangeError("Cognito token response did not include an id_token.")
 
     payload = validate_id_token(id_token)
     logger.info("Received ID token for subject %s", payload.get("sub", "<unknown>"))
-    
+
     merged_payload: Dict[str, Any] = dict(payload)
     access_token = tokens.get("access_token")
     if access_token:
@@ -155,7 +209,6 @@ async def exchange_code(body: ExchangeRequest):
         logger.exception("Unexpected error while exchanging code")
         return JSONResponse(status_code=500, content={"error": "Unable to exchange authorization code."})
 
-   
     token_bundle = TokenBundle(
         idToken=tokens.get("id_token"),
         accessToken=tokens.get("access_token"),
@@ -165,6 +218,33 @@ async def exchange_code(body: ExchangeRequest):
     )
 
     return {"ok": True, "tokens": token_bundle, "user": user}
+
+
+@app.post("/tasks/addTask", response_model=TaskResponse, status_code=201)
+def create_task(payload: TaskCreate) -> TaskResponse:
+    try:
+        task_id, user_email = insert_task(
+            payload.description,
+            payload.date,
+            payload.time,
+            payload.user_email,
+        )
+    except DatabaseError as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail="Failed to save task") from exc
+
+    saved_task = TaskResponse(
+        id=task_id,
+        description=payload.description,
+        date=payload.date,
+        time=payload.time,
+        user_email=user_email or None,
+    )
+
+    # Returning a plain dictionary prevents FastAPI's response validation from
+    # misinterpreting ``None`` as the entire payload when serialising the
+    # Pydantic model. This keeps the schema contract the frontend expects while
+    # still benefiting from ``response_model=TaskResponse``.
+    return saved_task.model_dump()
 
 
 __all__ = ["app"]

@@ -1,4 +1,4 @@
-"""SQLite helpers for persisting user profiles."""
+"""SQLite helpers for persisting user profiles and tasks."""
 
 from __future__ import annotations
 
@@ -6,12 +6,16 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 DATA_DIRECTORY = Path(__file__).resolve().parents[1] / "data"
 DATABASE_PATH = DATA_DIRECTORY / "app.db"
 
 _DB_LOCK = Lock()
+
+
+class DatabaseError(RuntimeError):
+    """Raised when a database operation fails."""
 
 
 def init_db() -> None:
@@ -94,4 +98,39 @@ def upsert_user(payload: Dict[str, Any]) -> Dict[str, Any]:
             connection.commit()
 
     return user
+
+
+def insert_task(
+    description: str,
+    task_date: str,
+    task_time: str,
+    user_email: str | None,
+) -> Tuple[int, str | None]:
+    """Insert a task row and return its identifier and normalized email."""
+
+    insert_sql = (
+        "INSERT INTO tasks (description, date, time, user_email, isactive) "
+        "VALUES (?, ?, ?, ?, 1)"
+    )
+    normalized_email = (user_email or "").strip()
+
+    try:
+        with _DB_LOCK:
+            with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+                # Parameter binding avoids SQL injection by keeping user input separate
+                # from the SQL statement itself.
+                cursor = connection.execute(
+                    insert_sql,
+                    (
+                        description,
+                        task_date,
+                        task_time,
+                        normalized_email,
+                    ),
+                )
+                connection.commit()
+    except sqlite3.Error as exc:  # pragma: no cover - defensive
+        raise DatabaseError("Failed to insert task") from exc
+
+    return cursor.lastrowid, (normalized_email or None)
 

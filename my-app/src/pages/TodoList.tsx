@@ -6,7 +6,11 @@ import Bin from './Bin';
 import { useTasks } from '../TasksContext';
 
 
-const TodoList: FC = () => {
+interface TodoListProps {
+  userEmail: string | null;
+}
+
+const TodoList: FC<TodoListProps> = ({ userEmail }) => {
 
   //Dictionary that uses string(selected date as key),listt of tasks as values)
   const { getTasks, deleteTask ,getTasksByDate} = useTasks();
@@ -50,7 +54,7 @@ const TodoList: FC = () => {
       {/* pass in the todolist of each day and the function that can modify 
       the todo list to the input container */}
       <div className="w-full flex justify-center">
-        <InputContainer selectedDate={selectedDate} />
+        <InputContainer selectedDate={selectedDate} userEmail={userEmail} />
       </div>
       <div className="w-full max-w-md flex flex-col items-center mt-8 space-y-4 flex-shrink-0">
         {todoList.map((task: ITask) => (
