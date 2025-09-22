@@ -6,7 +6,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 DATA_DIRECTORY = Path(__file__).resolve().parents[1] / "data"
 DATABASE_PATH = DATA_DIRECTORY / "app.db"
@@ -119,3 +119,40 @@ def insert_task(
         raise DatabaseError("Failed to insert task") from exc
 
     return cursor.lastrowid, (normalized_email or None)
+
+
+def fetch_tasks_by_email_and_date(
+    user_email: str,
+    task_date: str,
+) -> List[Dict[str, Any]]:
+    """Retrieve the active tasks for a user on a specific date."""
+
+    normalized_email = user_email.strip()
+    if not normalized_email:
+        return []
+
+    query = (
+        "SELECT id, description, date, time, user_email "
+        "FROM tasks WHERE user_email = ? AND date = ? AND isactive = 1 "
+        "ORDER BY time, id"
+    )
+
+    try:
+        with _DB_LOCK:
+            with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+                connection.row_factory = sqlite3.Row
+                rows = connection.execute(query, (normalized_email, task_date)).fetchall()
+    except sqlite3.Error as exc:  # pragma: no cover - defensive
+        raise DatabaseError("Failed to fetch tasks") from exc
+    
+    # list of dictionary
+    return [
+        {
+            "id": row["id"],
+            "description": row["description"],
+            "date": row["date"],
+            "time": row["time"],
+            "user_email": row["user_email"] or None,
+        }
+        for row in rows
+    ]

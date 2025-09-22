@@ -8,11 +8,11 @@ from contextlib import closing
 from datetime import date as date_cls, time as time_cls
 from typing import Any, Dict, Tuple
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, field_validator,AliasChoices
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from .auth import (
     TokenExchangeError,
@@ -23,7 +23,14 @@ from .auth import (
     validate_id_token,
 )
 from .config import get_settings
-from .db import DatabaseError, init_db, insert_task, upsert_user
+
+from .db import (
+    DatabaseError,
+    fetch_tasks_by_email_and_date,
+    init_db,
+    insert_task,
+    upsert_user,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -248,5 +255,42 @@ def create_task(payload: TaskCreate) -> TaskResponse:
     # Pydantic model. This keeps the schema contract the frontend expects while
     # still benefiting from ``response_model=TaskResponse``.
     return saved_task.model_dump()
+
+@app.get("/tasks/getActiveTasksByEmail", response_model=list[TaskResponse])
+def list_tasks(
+    date: str = Query(..., description="Date to filter tasks (YYYY-MM-DD)."),
+    user_email: str | None = Query(
+        default=None,
+        description="Email address to filter tasks (preferred parameter name).",
+    ),
+) -> list[Dict[str, Any]]:
+    """Return active tasks for the supplied user and date."""
+
+    
+    if user_email is None or not user_email.strip():
+        raise HTTPException(status_code=400, detail="A user email must be provided.")
+
+    try:
+        normalized_date = TaskCreate._normalize_date(date)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        tasks = fetch_tasks_by_email_and_date(user_email, normalized_date)
+    except DatabaseError as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail="Failed to fetch tasks.") from exc
+
+    task_models = [
+        TaskResponse(
+            id=task["id"],
+            description=task["description"],
+            date=task["date"],
+            time=task["time"],
+            user_email=task.get("user_email"),
+        )
+        for task in tasks
+    ]
+
+    return [task.model_dump() for task in task_models]
 
 __all__ = ["app"]

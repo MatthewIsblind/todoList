@@ -7,6 +7,7 @@ interface TaskContextType {
   deleteTask: (date: string, id: number) => void;
   getTasks: (date: string) => ITask[];
   getTasksByDate: () => Record<string, ITask[]>;
+  fetchTasksForDate: (date: string) => Promise<ITask[]>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -14,6 +15,13 @@ const TaskContext = createContext<TaskContextType | undefined>(undefined);
 export const TaskProvider = ({ children }: { children: ReactNode }) => {
   const [tasksByDate, setTasksByDate] = useState<Record<string, ITask[]>>({});
 
+  const apiBaseUrl = (process.env.REACT_APP_API_BASE_URL ?? '').replace(/\/$/, '');
+
+  const getCookie = useCallback((name: string): string | null => {
+    const match = document.cookie.match(new RegExp(`(^|;\\s*)${name}=([^;]+)`));
+    return match ? decodeURIComponent(match[2]) : null;
+  }, []);
+  
   const addTask = (date: string, task: ITask) => {
     setTasksByDate(prev => {
       const list = prev[date] || [];
@@ -37,8 +45,63 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     return { ...tasksByDate };
   }, [tasksByDate]);
 
+  const fetchTasksForDate = useCallback(
+    async (date: string) => {
+      const userEmail = getCookie('userEmail');
+      
+      if (!userEmail) {
+        console.warn('No user email cookie found. Skipping task fetch.');
+        setTasksByDate(prev => ({ ...prev, [date]: [] }));
+        return [];
+      }
+
+      const query = new URLSearchParams({ date, user_email: userEmail });
+
+      const endpoint = `${apiBaseUrl}/tasks/getActiveTasksByEmail?${query.toString()}`;
+
+      try {
+        const response = await fetch(endpoint, {
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as Array<
+          ITask & { user_email?: string | null }
+        >;
+
+        const normalizedTasks: ITask[] = payload.map(task => ({
+          id: task.id,
+          description: task.description,
+          date: task.date,
+          time: task.time,
+        }));
+
+        setTasksByDate(prev => ({ ...prev, [date]: normalizedTasks }));
+
+        return normalizedTasks;
+      } catch (error) {
+        console.error('Failed to fetch tasks for date', date, error);
+        setTasksByDate(prev => ({ ...prev, [date]: prev[date] ?? [] }));
+        throw error;
+      }
+    },
+    [apiBaseUrl, getCookie],
+  );
+
   return (
-    <TaskContext.Provider value={{ tasksByDate, addTask, deleteTask, getTasks ,getTasksByDate}}>
+    <TaskContext.Provider
+      value={{
+        tasksByDate,
+        addTask,
+        deleteTask,
+        getTasks,
+        getTasksByDate,
+        fetchTasksForDate,
+      }}
+    >
       {children}
     </TaskContext.Provider>
   );

@@ -1,4 +1,4 @@
-import React, { FC, useState, useEffect } from 'react';
+import React, { FC, useState, useEffect,useRef  } from 'react';
 import { ITask } from '../Interfaces';
 import InputContainer from '../components/InputContainer';
 import TodoTask from '../components/TodoTask';
@@ -8,8 +8,8 @@ import { useTasks } from '../TasksContext';
 
 const TodoList: FC = () => {
 
-  //Dictionary that uses string(selected date as key),listt of tasks as values)
-  const { getTasks, deleteTask ,getTasksByDate} = useTasks();
+  //functions that are being imported from the taskscontext
+  const { getTasks, deleteTask, getTasksByDate, fetchTasksForDate } = useTasks();
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -19,6 +19,21 @@ const TodoList: FC = () => {
   //Grab the relevent list of tasks uses the date, updates whenever setSelectedDate is called to change the date
   const todoList = getTasks(selectedDate);
 
+  const lastFetchedDateRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (lastFetchedDateRef.current === selectedDate) {
+      return;
+    }
+
+    lastFetchedDateRef.current = selectedDate;
+
+    fetchTasksForDate(selectedDate).catch(error => {
+      console.error('Unable to load tasks for date', selectedDate, error);
+      lastFetchedDateRef.current = null;
+    });
+  }, [selectedDate, fetchTasksForDate]);
+
   const handleDelete = (taskId: number): void => {
     deleteTask(selectedDate, taskId);
   };
@@ -26,7 +41,7 @@ const TodoList: FC = () => {
    useEffect(() => {
     // Log the entire task mapping whenever the tasks for the selected date change
     console.log('Updated todo list:', getTasksByDate());
-  }, [todoList, getTasksByDate]);
+  }, [todoList, getTasksByDate,selectedDate]);
   
   return (
     <div className="flex flex-col items-center min-h-screen w-full bg-gray-100 font-sans p-4 overflow-y-auto">
