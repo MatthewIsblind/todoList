@@ -36,9 +36,9 @@ const Contact: React.FC<BinProps> = ({embedded = false,onClose}) => {
     const [binData, setBinData] = useState<BinInfo[]>([]);
     const [notes, setNotes] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(false);
-    const { addTask } = useTasks();
+    const { createTask } = useTasks();
 
-    const addNextBinTask = () => {
+    const addNextBinTask = async () => {
         const rawDate = binData[0].recurrence;
         
         const nextBinDate = rawDate.split('T')[0];
@@ -53,18 +53,19 @@ const Contact: React.FC<BinProps> = ({embedded = false,onClose}) => {
             description = 'Take the bin out. No recycling this week'
         }
 
-        const task: ITask = {
-            id: Date.now(),
-            description: description,
-            time: '18:00',
-            date : nextBinDate,
-        };
-        console.log('next bin task',task)
-        addTask(nextBinDate, task);
+        try {
+            await createTask({
+                description,
+                time: '18:00',
+                date: nextBinDate,
+            });
 
-        // Close the modal if a close handler was provided
-        if (onClose) {
-            onClose();
+            // Close the modal if a close handler was provided
+            if (onClose) {
+                onClose();
+            }
+        } catch (error) {
+            console.error('Failed to save bin reminder task', error);
         }
 
     };

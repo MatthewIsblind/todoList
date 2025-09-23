@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, ReactNode ,useCallback} from 'react';
-import { ITask } from './Interfaces';
+import { ITask,TaskResponse } from './Interfaces';
 
 interface TaskContextType {
   tasksByDate: Record<string, ITask[]>;
   addTask: (date: string, task: ITask) => void;
+  createTask: (task: Omit<ITask, 'id'>) => Promise<ITask>;
   deleteTask: (date: string, id: number) => Promise<void>
   getTasks: (date: string) => ITask[];
   getTasksByDate: () => Record<string, ITask[]>;
@@ -22,12 +23,56 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     return match ? decodeURIComponent(match[2]) : null;
   }, []);
   
-  const addTask = (date: string, task: ITask) => {
+  const addTask = useCallback((date: string, task: ITask) => {
     setTasksByDate(prev => {
       const list = prev[date] || [];
       return { ...prev, [date]: [...list, task] };
     });
-  };
+  }, []);
+
+  const createTask = useCallback(
+    async (task: Omit<ITask, 'id'>) => {
+      const endpoint = `${apiBaseUrl}/tasks/addTask`;
+      const userEmail = getCookie('userEmail');
+
+      const payload = {
+        ...task,
+        id: Date.now(),
+        user_email: userEmail,
+      };
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const savedTask = (await response.json()) as TaskResponse;
+        const newTask: ITask = {
+          id: savedTask.id,
+          description: savedTask.description,
+          date: savedTask.date,
+          time: savedTask.time,
+        };
+
+        addTask(task.date, newTask);
+
+        return newTask;
+      } catch (error) {
+        console.error('Failed to save task', error);
+        throw error;
+      }
+    },
+    [addTask, apiBaseUrl, getCookie],
+  );
 
 
   const deleteTask = useCallback(
@@ -130,6 +175,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
       value={{
         tasksByDate,
         addTask,
+        createTask,
         deleteTask,
         getTasks,
         getTasksByDate,

@@ -6,14 +6,8 @@ export interface InputContainerProps {
   selectedDate: string;
 }
 
-const getCookie = (name: string): string |null  => {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? match[2] : null
-};
-
-
 const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
-    const { addTask } = useTasks();
+    const { createTask } = useTasks();
     
     
     const [description, setDescription] = useState<string>('');
@@ -49,45 +43,18 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
             setError('Both description and time are required.');
             return;
         }
-        
-        const userEmail = getCookie('userEmail') 
-        const payload = {
-            id: Date.now(),
-            description,
-            time,
-            date: selectedDate,
-            user_email : userEmail
-        };
 
         try {
-            const response = await fetch(saveTaskCallUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify(payload),
+            await createTask({
+                description,
+                time,
+                date: selectedDate,
             });
-
-            if (!response.ok) {
-                throw new Error(`Request failed with status ${response.status}`);
-            }
-             
-            const savedTask = (await response.json() as TaskResponse) 
-            console.log('response is ', savedTask );
-            
-            const newTask: ITask = {
-                id: savedTask.id,   
-                description : savedTask.description,
-                time : savedTask.time,
-                date: savedTask.date
-            };
-
-            addTask(selectedDate,newTask)
 
             setDescription('');
             setTime('');
             setError('');
+        
         } catch (fetchError) {
             console.error('Failed to save task', fetchError);
             setError('Failed to save task. Please try again.');
