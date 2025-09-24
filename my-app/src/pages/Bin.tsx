@@ -1,5 +1,4 @@
 import React, { ChangeEvent, FormEvent, useState } from 'react';
-import {ITask} from '../Interfaces';
 import { useTasks } from '../TasksContext';
 
 // Model representing the structure of the bin data returned from the API
