@@ -1,5 +1,4 @@
-import React, {FC,ChangeEvent,useState, useEffect} from 'react';
-import {ITask,TaskResponse} from '../Interfaces';
+import React, {FC,ChangeEvent,useState, } from 'react';
 import { useTasks } from '../TasksContext';
 
 export interface InputContainerProps {
@@ -18,7 +17,7 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
     // The conditiational check what input fields has been changed and will change 
     // the state base on what the input fields is
     const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
-        const userEmail = getCookie('userEmail');
+        
         if (event.target.name === 'description') {
             setDescription(event.target.value);
         } else if (event.target.name === 'time') {
@@ -27,15 +26,6 @@ const InputContainer: FC<InputContainerProps> = ({ selectedDate }) => {
         if (error) {
             setError('');
         }
-    };
-    
-    const apiBaseUrl = process.env.REACT_APP_API_BASE_URL?.replace(/\/$/, '') ?? '';
-    const saveTaskCallUrl = `${apiBaseUrl}/tasks/addTask`;
-
-    
-    const getCookie = (name: string): string | null => {
-        const match = document.cookie.match(new RegExp(`(^|;\\s*)${name}=([^;]+)`));
-        return match ? decodeURIComponent(match[2]) : null;
     };
 
     const addTaskHandler = async (): Promise<void> => {
