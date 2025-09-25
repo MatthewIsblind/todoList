@@ -153,8 +153,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       response_type: responseType,
       scope: scopes,
       redirect_uri: cognitoRedirectUri,
+      prompt:'select_account'
     });
-
+    console.log(`${baseUrl}/oauth2/authorize?${params.toString()}`)
     return `${baseUrl}/oauth2/authorize?${params.toString()}`;
   }, [
     cognitoClientId,
@@ -165,7 +166,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   ]);
 
   const handleLogin = useCallback(() => {
-    console.log('handleLogin')
+    console.log('handleLogin', authorizeUrl)
     if (!authorizeUrl) {
       return;
     }
