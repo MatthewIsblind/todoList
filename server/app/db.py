@@ -1,43 +1,127 @@
-"""SQLite helpers for persisting user profiles."""
+"""Database helpers for persisting user profiles and tasks."""
 
 from __future__ import annotations
 
-import sqlite3
-from contextlib import closing
+import os
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.pool import NullPool
 
 DATA_DIRECTORY = Path(__file__).resolve().parents[1] / "data"
 DATABASE_PATH = DATA_DIRECTORY / "app.db"
 
-_DB_LOCK = Lock()
 
 class DatabaseError(RuntimeError):
     """Raised when a database operation fails."""
 
 
+def _build_engine() -> Engine:
+    """Return an SQLAlchemy engine based on the configured database URL."""
+
+    database_url = os.getenv("DATABASE_URL")
+
+    if database_url:
+        url = database_url
+    else:
+        DATA_DIRECTORY.mkdir(parents=True, exist_ok=True)
+        url = f"sqlite:///{DATABASE_PATH}"
+
+    if url.startswith("sqlite"):
+        return create_engine(
+            url,
+            future=True,
+            connect_args={"check_same_thread": False},
+            poolclass=NullPool,
+        )
+
+    pool_size = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+    max_overflow = int(os.getenv("DATABASE_MAX_OVERFLOW", "2"))
+
+    return create_engine(
+        url,
+        future=True,
+        pool_pre_ping=True,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+    )
+
+
+ENGINE = _build_engine()
+
+_DB_LOCK = Lock() if ENGINE.url.get_backend_name() == "sqlite" else None
+
+
+@contextmanager
+def _locked() -> Iterable[None]:
+    """Yield while holding a lock when required for SQLite."""
+
+    if _DB_LOCK is None:
+        with nullcontext():
+            yield
+        return
+
+    with _DB_LOCK:
+        yield
+
+
 def init_db() -> None:
-    """Ensure the SQLite database and users table exist."""
+    """Ensure the database schema exists."""
 
-    DATA_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    users_sql = text(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            sub TEXT PRIMARY KEY,
+            email TEXT,
+            name TEXT,
+            given_name TEXT,
+            family_name TEXT,
+            picture TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
 
-    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
-        connection.execute(
+    if ENGINE.url.get_backend_name() == "postgresql":
+        tasks_sql = text(
             """
-            CREATE TABLE IF NOT EXISTS users (
-                sub TEXT PRIMARY KEY,
-                email TEXT,
-                name TEXT,
-                given_name TEXT,
-                family_name TEXT,
-                picture TEXT,
+            CREATE TABLE IF NOT EXISTS tasks (
+                id BIGSERIAL PRIMARY KEY,
+                description TEXT NOT NULL,
+                date TEXT NOT NULL,
+                time TEXT NOT NULL,
+                user_email TEXT,
+                isactive INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    else:
+        tasks_sql = text(
+            """
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT NOT NULL,
+                date TEXT NOT NULL,
+                time TEXT NOT NULL,
+                user_email TEXT,
+                isactive INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
-        connection.commit()
+
+    with ENGINE.begin() as connection:
+        connection.execute(users_sql)
+        connection.execute(tasks_sql)
 
 
 def upsert_user(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -56,9 +140,10 @@ def upsert_user(payload: Dict[str, Any]) -> Dict[str, Any]:
         "picture": payload.get("picture"),
     }
 
-    query = """
+    query = text(
+        """
         INSERT INTO users (sub, email, name, given_name, family_name, picture, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (:sub, :email, :name, :given_name, :family_name, :picture, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT(sub) DO UPDATE SET
             email=excluded.email,
             name=excluded.name,
@@ -66,22 +151,15 @@ def upsert_user(payload: Dict[str, Any]) -> Dict[str, Any]:
             family_name=excluded.family_name,
             picture=excluded.picture,
             updated_at=CURRENT_TIMESTAMP
-    """
+        """
+    )
 
-    with _DB_LOCK:
-        with closing(sqlite3.connect(DATABASE_PATH)) as connection:
-            connection.execute(
-                query,
-                (
-                    user["sub"],
-                    user["email"],
-                    user["name"],
-                    user["given_name"],
-                    user["family_name"],
-                    user["picture"],
-                ),
-            )
-            connection.commit()
+    with _locked():
+        try:
+            with ENGINE.begin() as connection:
+                connection.execute(query, user)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise DatabaseError("Failed to upsert user") from exc
 
     return user
 
@@ -94,31 +172,44 @@ def insert_task(
 ) -> Tuple[int, str | None]:
     """Insert a task row and return its identifier and normalized email."""
 
-    insert_sql = (
-        "INSERT INTO tasks (description, date, time, user_email, isactive) "
-        "VALUES (?, ?, ?, ?, 1)"
-    )
+    if ENGINE.url.get_backend_name() == "postgresql":
+        insert_sql = text(
+            """
+            INSERT INTO tasks (description, date, time, user_email, isactive)
+            VALUES (:description, :date, :time, :user_email, 1)
+            RETURNING id
+            """
+        )
+    else:
+        insert_sql = text(
+            """
+            INSERT INTO tasks (description, date, time, user_email, isactive)
+            VALUES (:description, :date, :time, :user_email, 1)
+            """
+        )
+
     normalized_email = (user_email or "").strip()
-    print("this is the email: + " + str(normalized_email))
+
     try:
-        with _DB_LOCK:
-            with closing(sqlite3.connect(DATABASE_PATH)) as connection:
-                # Parameter binding avoids SQL injection by keeping user input separate
-                # from the SQL statement itself.
-                cursor = connection.execute(
+        with _locked():
+            with ENGINE.begin() as connection:
+                result = connection.execute(
                     insert_sql,
-                    (
-                        description,
-                        task_date,
-                        task_time,
-                        normalized_email,
-                    ),
+                    {
+                        "description": description,
+                        "date": task_date,
+                        "time": task_time,
+                        "user_email": normalized_email,
+                    },
                 )
-                connection.commit()
-    except sqlite3.Error as exc:  # pragma: no cover - defensive
+                if ENGINE.url.get_backend_name() == "postgresql":
+                    task_id = result.scalar_one()
+                else:
+                    task_id = result.lastrowid
+    except SQLAlchemyError as exc:  # pragma: no cover - defensive
         raise DatabaseError("Failed to insert task") from exc
 
-    return cursor.lastrowid, (normalized_email or None)
+    return int(task_id), (normalized_email or None)
 
 
 def fetch_tasks_by_email_and_date(
@@ -131,31 +222,26 @@ def fetch_tasks_by_email_and_date(
     if not normalized_email:
         return []
 
-    query = (
-        "SELECT id, description, date, time, user_email "
-        "FROM tasks WHERE user_email = ? AND date = ? AND isactive = 1 "
-        "ORDER BY time, id"
+    query = text(
+        """
+        SELECT id, description, date, time, user_email
+        FROM tasks
+        WHERE user_email = :user_email AND date = :task_date AND isactive = 1
+        ORDER BY time, id
+        """
     )
 
     try:
-        with _DB_LOCK:
-            with closing(sqlite3.connect(DATABASE_PATH)) as connection:
-                connection.row_factory = sqlite3.Row
-                rows = connection.execute(query, (normalized_email, task_date)).fetchall()
-    except sqlite3.Error as exc:  # pragma: no cover - defensive
+        with _locked():
+            with ENGINE.connect() as connection:
+                rows = connection.execute(
+                    query,
+                    {"user_email": normalized_email, "task_date": task_date},
+                ).mappings().all()
+    except SQLAlchemyError as exc:  # pragma: no cover - defensive
         raise DatabaseError("Failed to fetch tasks") from exc
-    
-    # list of dictionary
-    return [
-        {
-            "id": row["id"],
-            "description": row["description"],
-            "date": row["date"],
-            "time": row["time"],
-            "user_email": row["user_email"] or None,
-        }
-        for row in rows
-    ]
+
+    return [dict(row) for row in rows]
 
 
 
@@ -165,15 +251,20 @@ def deactivate_task(task_id: int) -> bool:
     Returns ``True`` when a row is updated and ``False`` when no matching task
     exists.
     """
-    
-    query = "UPDATE tasks SET isactive = 0 WHERE id = ? AND isactive = 1"
+
+    query = text(
+        """
+        UPDATE tasks
+        SET isactive = 0
+        WHERE id = :task_id AND isactive = 1
+        """
+    )
 
     try:
-        with _DB_LOCK:
-            with closing(sqlite3.connect(DATABASE_PATH)) as connection:
-                cursor = connection.execute(query, (task_id,))
-                connection.commit()
-    except sqlite3.Error as exc:  # pragma: no cover - defensive
+        with _locked():
+            with ENGINE.begin() as connection:
+                result = connection.execute(query, {"task_id": task_id})
+    except SQLAlchemyError as exc:  # pragma: no cover - defensive
         raise DatabaseError("Failed to delete task") from exc
 
-    return cursor.rowcount > 0
+    return result.rowcount > 0

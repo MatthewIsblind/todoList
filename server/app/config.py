@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import List, Tuple
@@ -12,6 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables from a local .env file if present.
 load_dotenv()
 
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Settings:
@@ -25,6 +27,9 @@ class Settings:
     cognito_domain: str
     cognito_redirect_uris: Tuple[str, ...]
     allowed_origins: List[str]
+    database_url: str | None
+    database_pool_size: int
+    database_max_overflow: int
 
     @property
     def issuer(self) -> str:
@@ -149,4 +154,7 @@ def get_settings() -> Settings:
         cognito_domain=os.environ["COGNITO_DOMAIN"],
         cognito_redirect_uris=redirect_uris,
         allowed_origins=allowed_origins,
+        database_url=os.getenv("DATABASE_URL"),
+        database_pool_size=int(os.getenv("DATABASE_POOL_SIZE", "5")),
+        database_max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "2")),
     )
